@@ -89,8 +89,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/app/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/app/components/ui/avatar";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
+import {
+  Avatar,
+  AvatarFallback,
+} from "@/app/components/ui/avatar";
 import { Separator } from "@/app/components/ui/separator";
 import { Textarea } from "@/app/components/ui/textarea";
 import { Label } from "@/app/components/ui/label";
@@ -203,7 +211,9 @@ interface AuthContextValue {
   isSuperAdmin: boolean;
 }
 
-const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
+const AuthContext = createContext<AuthContextValue>(
+  {} as AuthContextValue,
+);
 const useAuth = () => useContext(AuthContext);
 
 // ─── Data Context ─────────────────────────────────────────────────────────────
@@ -213,34 +223,69 @@ interface DataContextValue {
   doRegister: (eventId: string) => void;
   doCancel: (eventId: string) => void;
   doApplyClub: (clubId: string) => void;
-  doReviewMembership: (membershipId: string, action: "approved" | "rejected") => void;
+  doReviewMembership: (
+    membershipId: string,
+    action: "approved" | "rejected",
+  ) => void;
   doRemoveMember: (membershipId: string) => void;
-  doCreateEvent: (data: Omit<Event, "id" | "registered_count" | "waitlisted_count">) => void;
-  doUpdateEvent: (eventId: string, updates: Partial<Event>) => void;
+  doCreateEvent: (
+    data: Omit<
+      Event,
+      "id" | "registered_count" | "waitlisted_count"
+    >,
+  ) => void;
+  doUpdateEvent: (
+    eventId: string,
+    updates: Partial<Event>,
+  ) => void;
   doCancelEvent: (eventId: string) => void;
   doDeleteEvent: (eventId: string) => void;
   doDeleteClub: (clubId: string) => void;
   doMarkNotificationsRead: () => void;
-  doUpdateProfile: (updates: Partial<Pick<User, "name" | "department" | "bio">>) => void;
-  doRegisterUser: (data: { name: string; email: string; student_id: string; department: string }) => string;
-  doSubmitRoleRequest: (payload: Omit<RoleRequest, "id" | "user_id" | "status" | "created_at">) => void;
-  doReviewRoleRequest: (requestId: string, action: "approved" | "rejected") => void;
+  doUpdateProfile: (
+    updates: Partial<Pick<User, "name" | "department" | "bio">>,
+  ) => void;
+  doRegisterUser: (data: {
+    name: string;
+    email: string;
+    student_id: string;
+    department: string;
+  }) => string;
+  doSubmitRoleRequest: (
+    payload: Omit<
+      RoleRequest,
+      "id" | "user_id" | "status" | "created_at"
+    >,
+  ) => void;
+  doReviewRoleRequest: (
+    requestId: string,
+    action: "approved" | "rejected",
+  ) => void;
   doChangeUserRole: (userId: string, newRole: UserRole) => void;
   doCheckIn: (registrationId: string, value: boolean) => void;
   doToggleException: (eventId: string, date: string) => void;
   doSendDigest: () => void;
 }
 
-const DataContext = createContext<DataContextValue>({} as DataContextValue);
+const DataContext = createContext<DataContextValue>(
+  {} as DataContextValue,
+);
 const useData = () => useContext(DataContext);
 
 // ─── Providers ────────────────────────────────────────────────────────────────
 
-function Providers({ children }: { children: React.ReactNode }) {
+function Providers({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [store, setStore] = useState<StoreState>(loadStore);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(loadAuth);
+  const [currentUserId, setCurrentUserId] = useState<
+    string | null
+  >(loadAuth);
 
-  const currentUser = store.users.find((u) => u.id === currentUserId) ?? null;
+  const currentUser =
+    store.users.find((u) => u.id === currentUserId) ?? null;
 
   // Persist store + session to localStorage on every change.
   useEffect(() => {
@@ -253,7 +298,8 @@ function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      if (currentUserId) localStorage.setItem(AUTH_KEY, currentUserId);
+      if (currentUserId)
+        localStorage.setItem(AUTH_KEY, currentUserId);
       else localStorage.removeItem(AUTH_KEY);
     } catch {
       // ignore storage errors
@@ -274,89 +320,127 @@ function Providers({ children }: { children: React.ReactNode }) {
       setStore((s) => {
         const event = s.events.find((e) => e.id === eventId)!;
         const isFull = event.registered_count >= event.capacity;
-        const next = registerForEvent(s, currentUserId ?? "", eventId);
-        toast.success(isFull ? "Added to waitlist" : "Registered successfully!", {
-          description: isFull
-            ? `You joined the waitlist for "${event.title}".`
-            : `See you at "${event.title}"!`,
-        });
+        const next = registerForEvent(
+          s,
+          currentUserId ?? "",
+          eventId,
+        );
+        toast.success(
+          isFull
+            ? "Added to waitlist"
+            : "Registered successfully!",
+          {
+            description: isFull
+              ? `You joined the waitlist for "${event.title}".`
+              : `See you at "${event.title}"!`,
+          },
+        );
         return next;
       });
     },
-    [currentUserId]
+    [currentUserId],
   );
 
   const doCancel = useCallback(
     (eventId: string) => {
       setStore((s) => {
         const event = s.events.find((e) => e.id === eventId)!;
-        const next = cancelRegistration(s, currentUserId ?? "", eventId);
+        const next = cancelRegistration(
+          s,
+          currentUserId ?? "",
+          eventId,
+        );
         toast.info("Registration cancelled", {
           description: `Cancelled for "${event.title}".`,
         });
         return next;
       });
     },
-    [currentUserId]
+    [currentUserId],
   );
 
   const doApplyClub = useCallback(
     (clubId: string) => {
       setStore((s) => {
         const club = s.clubs.find((c) => c.id === clubId)!;
-        const next = applyToClub(s, currentUserId ?? "", clubId);
+        const next = applyToClub(
+          s,
+          currentUserId ?? "",
+          clubId,
+        );
         toast.success("Application submitted", {
           description: `Your request to join ${club.name} has been sent.`,
         });
         return next;
       });
     },
-    [currentUserId]
+    [currentUserId],
   );
 
   const doReviewMembership = useCallback(
     (membershipId: string, action: "approved" | "rejected") => {
       setStore((s) => {
-        const mem = s.memberships.find((m) => m.id === membershipId);
+        const mem = s.memberships.find(
+          (m) => m.id === membershipId,
+        );
         const user = s.users.find((u) => u.id === mem?.user_id);
         const next = reviewMembership(s, membershipId, action);
-        toast.success(action === "approved" ? "Member approved" : "Application rejected", {
-          description: `${user?.name}'s request was ${action}.`,
-        });
+        toast.success(
+          action === "approved"
+            ? "Member approved"
+            : "Application rejected",
+          {
+            description: `${user?.name}'s request was ${action}.`,
+          },
+        );
         return next;
       });
     },
-    []
+    [],
   );
 
   const doRemoveMember = useCallback((membershipId: string) => {
     setStore((s) => {
-      const mem = s.memberships.find((m) => m.id === membershipId);
+      const mem = s.memberships.find(
+        (m) => m.id === membershipId,
+      );
       const user = s.users.find((u) => u.id === mem?.user_id);
       const next = removeMember(s, membershipId);
-      toast.info("Member removed", { description: `${user?.name} removed from club.` });
+      toast.info("Member removed", {
+        description: `${user?.name} removed from club.`,
+      });
       return next;
     });
   }, []);
 
   const doCreateEvent = useCallback(
-    (data: Omit<Event, "id" | "registered_count" | "waitlisted_count">) => {
+    (
+      data: Omit<
+        Event,
+        "id" | "registered_count" | "waitlisted_count"
+      >,
+    ) => {
       setStore((s) => {
         const next = createEvent(s, data);
-        toast.success("Event created", { description: `"${data.title}" is now published.` });
+        toast.success("Event created", {
+          description: `"${data.title}" is now published.`,
+        });
         return next;
       });
     },
-    []
+    [],
   );
 
-  const doUpdateEvent = useCallback((eventId: string, updates: Partial<Event>) => {
-    setStore((s) => {
-      const next = updateEvent(s, eventId, updates);
-      toast.success("Event updated");
-      return next;
-    });
-  }, []);
+  const doUpdateEvent = useCallback(
+    (eventId: string, updates: Partial<Event>) => {
+      setStore((s) => {
+        const next = updateEvent(s, eventId, updates);
+        toast.success("Event updated");
+        return next;
+      });
+    },
+    [],
+  );
 
   const doCancelEvent = useCallback((eventId: string) => {
     setStore((s) => {
@@ -386,81 +470,126 @@ function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   const doMarkNotificationsRead = useCallback(() => {
-    setStore((s) => markNotificationsRead(s, currentUserId ?? ""));
+    setStore((s) =>
+      markNotificationsRead(s, currentUserId ?? ""),
+    );
   }, [currentUserId]);
 
   const doUpdateProfile = useCallback(
-    (updates: Partial<Pick<User, "name" | "department" | "bio">>) => {
+    (
+      updates: Partial<
+        Pick<User, "name" | "department" | "bio">
+      >,
+    ) => {
       setStore((s) => {
-        const next = updateProfile(s, currentUserId ?? "", updates);
+        const next = updateProfile(
+          s,
+          currentUserId ?? "",
+          updates,
+        );
         toast.success("Profile updated");
         return next;
       });
     },
-    [currentUserId]
+    [currentUserId],
   );
 
   const doRegisterUser = useCallback(
-    (data: { name: string; email: string; student_id: string; department: string }) => {
+    (data: {
+      name: string;
+      email: string;
+      student_id: string;
+      department: string;
+    }) => {
       const { state: next, userId } = registerUser(store, data);
       setStore(next);
       return userId;
     },
-    [store]
+    [store],
   );
 
   const doSubmitRoleRequest = useCallback(
-    (payload: Omit<RoleRequest, "id" | "user_id" | "status" | "created_at">) => {
+    (
+      payload: Omit<
+        RoleRequest,
+        "id" | "user_id" | "status" | "created_at"
+      >,
+    ) => {
       setStore((s) => {
-        const next = submitRoleRequest(s, currentUserId ?? "", payload);
+        const next = submitRoleRequest(
+          s,
+          currentUserId ?? "",
+          payload,
+        );
         toast.success("Request submitted", {
-          description: "The Student Affairs office will review your request.",
+          description:
+            "The Student Affairs office will review your request.",
         });
         return next;
       });
     },
-    [currentUserId]
+    [currentUserId],
   );
 
   const doReviewRoleRequest = useCallback(
     (requestId: string, action: "approved" | "rejected") => {
       setStore((s) => {
         const next = reviewRoleRequest(s, requestId, action);
-        toast.success(action === "approved" ? "Request approved" : "Request rejected");
+        toast.success(
+          action === "approved"
+            ? "Request approved"
+            : "Request rejected",
+        );
         return next;
       });
     },
-    []
+    [],
   );
 
-  const doChangeUserRole = useCallback((userId: string, newRole: UserRole) => {
-    setStore((s) => {
-      const next = changeUserRole(s, userId, newRole);
-      toast.success("User role updated");
-      return next;
-    });
-  }, []);
-
-  const doCheckIn = useCallback((registrationId: string, value: boolean) => {
-    setStore((s) => setCheckIn(s, registrationId, value));
-  }, []);
-
-  const doToggleException = useCallback((eventId: string, date: string) => {
-    setStore((s) => {
-      const wasSkipped = (s.events.find((e) => e.id === eventId)?.exception_dates ?? []).includes(date);
-      const next = toggleEventException(s, eventId, date);
-      toast.info(wasSkipped ? "Session restored" : "Session cancelled", {
-        description: `${wasSkipped ? "Re-added" : "Skipped"} the ${date} occurrence.`,
+  const doChangeUserRole = useCallback(
+    (userId: string, newRole: UserRole) => {
+      setStore((s) => {
+        const next = changeUserRole(s, userId, newRole);
+        toast.success("User role updated");
+        return next;
       });
-      return next;
-    });
-  }, []);
+    },
+    [],
+  );
+
+  const doCheckIn = useCallback(
+    (registrationId: string, value: boolean) => {
+      setStore((s) => setCheckIn(s, registrationId, value));
+    },
+    [],
+  );
+
+  const doToggleException = useCallback(
+    (eventId: string, date: string) => {
+      setStore((s) => {
+        const wasSkipped = (
+          s.events.find((e) => e.id === eventId)
+            ?.exception_dates ?? []
+        ).includes(date);
+        const next = toggleEventException(s, eventId, date);
+        toast.info(
+          wasSkipped ? "Session restored" : "Session cancelled",
+          {
+            description: `${wasSkipped ? "Re-added" : "Skipped"} the ${date} occurrence.`,
+          },
+        );
+        return next;
+      });
+    },
+    [],
+  );
 
   const doSendDigest = useCallback(() => {
     setStore((s) => {
       const next = sendDigest(s, currentUserId ?? "");
       toast.success("Digest sent", {
-        description: "Your reminder digest is in your notifications.",
+        description:
+          "Your reminder digest is in your notifications.",
       });
       return next;
     });
@@ -500,7 +629,9 @@ function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={authValue}>
-      <DataContext.Provider value={dataValue}>{children}</DataContext.Provider>
+      <DataContext.Provider value={dataValue}>
+        {children}
+      </DataContext.Provider>
     </AuthContext.Provider>
   );
 }
@@ -534,24 +665,41 @@ function roleBadge(role: string) {
 function categoryColor(cat: string) {
   const map: Record<string, string> = {
     Technology: "bg-primary/10 text-primary border-primary/30",
-    Academic: "bg-secondary/15 text-secondary-foreground border-secondary/40",
-    "Arts & Culture": "bg-accent/15 text-accent-foreground border-accent/40",
-    Social: "bg-quaternary/15 text-foreground border-quaternary/40",
+    Academic:
+      "bg-secondary/15 text-secondary-foreground border-secondary/40",
+    "Arts & Culture":
+      "bg-accent/15 text-accent-foreground border-accent/40",
+    Social:
+      "bg-quaternary/15 text-foreground border-quaternary/40",
   };
-  return map[cat] ?? "bg-muted text-muted-foreground border-border-soft";
+  return (
+    map[cat] ??
+    "bg-muted text-muted-foreground border-border-soft"
+  );
 }
 
 // ─── Shared Components ────────────────────────────────────────────────────────
 
-function CapacityBar({ registered, capacity }: { registered: number; capacity: number }) {
-  const pct = Math.min(100, Math.round((registered / capacity) * 100));
+function CapacityBar({
+  registered,
+  capacity,
+}: {
+  registered: number;
+  capacity: number;
+}) {
+  const pct = Math.min(
+    100,
+    Math.round((registered / capacity) * 100),
+  );
   return (
     <div className="space-y-1">
       <div className="flex justify-between items-center">
         <span className="text-xs text-muted-foreground font-mono">
           {registered}/{capacity} seats
         </span>
-        <span className="text-xs text-muted-foreground font-mono">{pct}%</span>
+        <span className="text-xs text-muted-foreground font-mono">
+          {pct}%
+        </span>
       </div>
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
         <div
@@ -569,7 +717,8 @@ function EventCard({ event }: { event: Event }) {
   const navigate = useNavigate();
   const club = store.clubs.find((c) => c.id === event.club_id);
   const myReg = store.registrations.find(
-    (r) => r.user_id === currentUser?.id && r.event_id === event.id
+    (r) =>
+      r.user_id === currentUser?.id && r.event_id === event.id,
   );
   const isFull = event.registered_count >= event.capacity;
 
@@ -603,13 +752,17 @@ function EventCard({ event }: { event: Event }) {
                   : "bg-accent text-foreground"
               }`}
             >
-              {myReg.status === "registered" ? "Registered" : "Waitlisted"}
+              {myReg.status === "registered"
+                ? "Registered"
+                : "Waitlisted"}
             </span>
           </div>
         )}
         {event.status === "cancelled" && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <span className="text-white font-semibold text-sm">Cancelled</span>
+            <span className="text-white font-semibold text-sm">
+              Cancelled
+            </span>
           </div>
         )}
         {isFull && !myReg && event.status !== "cancelled" && (
@@ -633,7 +786,9 @@ function EventCard({ event }: { event: Event }) {
       <CardContent className="pb-3 flex-1 space-y-2">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <CalendarDays className="size-3 shrink-0" />
-          <span>{format(parseISO(event.date), "d MMM yyyy")}</span>
+          <span>
+            {format(parseISO(event.date), "d MMM yyyy")}
+          </span>
           <span>·</span>
           <Clock className="size-3 shrink-0" />
           <span>{event.start_time}</span>
@@ -645,7 +800,10 @@ function EventCard({ event }: { event: Event }) {
       </CardContent>
 
       <CardFooter className="pt-0 pb-4">
-        <CapacityBar registered={event.registered_count} capacity={event.capacity} />
+        <CapacityBar
+          registered={event.registered_count}
+          capacity={event.capacity}
+        />
       </CardFooter>
     </Card>
   );
@@ -656,7 +814,8 @@ function ClubCard({ club }: { club: Club }) {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const membership = store.memberships.find(
-    (m) => m.user_id === currentUser?.id && m.club_id === club.id
+    (m) =>
+      m.user_id === currentUser?.id && m.club_id === club.id,
   );
 
   return (
@@ -686,17 +845,23 @@ function ClubCard({ club }: { club: Club }) {
           {membership && (
             <BadgeCheck
               className={`size-5 shrink-0 mt-1 ${
-                membership.status === "approved" ? "text-quaternary" : "text-accent"
+                membership.status === "approved"
+                  ? "text-quaternary"
+                  : "text-accent"
               }`}
             />
           )}
         </div>
       </CardHeader>
       <CardContent className="pb-4 space-y-2">
-        <p className="text-xs text-muted-foreground line-clamp-2">{club.description}</p>
+        <p className="text-xs text-muted-foreground line-clamp-2">
+          {club.description}
+        </p>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
           <Users className="size-3" />
-          <span>{club.member_count.toLocaleString()} members</span>
+          <span>
+            {club.member_count.toLocaleString()} members
+          </span>
         </div>
       </CardContent>
     </Card>
@@ -729,9 +894,17 @@ function StatCard({
         <Icon className="size-5" />
       </div>
       <div>
-        <p className="text-2xl font-bold font-mono text-foreground">{value}</p>
-        <p className="text-sm font-medium text-foreground mt-0.5">{label}</p>
-        {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+        <p className="text-2xl font-bold font-mono text-foreground">
+          {value}
+        </p>
+        <p className="text-sm font-medium text-foreground mt-0.5">
+          {label}
+        </p>
+        {sub && (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {sub}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -753,8 +926,12 @@ function EmptyState({
       <div className="rounded-full bg-muted p-4 mb-4">
         <Icon className="size-8 text-muted-foreground" />
       </div>
-      <h3 className="font-semibold text-foreground mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground max-w-xs mb-4">{description}</p>
+      <h3 className="font-semibold text-foreground mb-1">
+        {title}
+      </h3>
+      <p className="text-sm text-muted-foreground max-w-xs mb-4">
+        {description}
+      </p>
       {action}
     </div>
   );
@@ -772,7 +949,7 @@ function NotificationBell() {
     .slice(0, 8);
 
   const unread = store.notifications.filter(
-    (n) => n.user_id === currentUser?.id && !n.is_read
+    (n) => n.user_id === currentUser?.id && !n.is_read,
   ).length;
 
   const notifIcon = (type: Notification["type"]) => {
@@ -795,7 +972,11 @@ function NotificationBell() {
   return (
     <DropdownMenu open={open} onOpenChange={handleOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+        >
           <Bell className="size-4" />
           {unread > 0 && (
             <span className="absolute -top-0.5 -right-0.5 size-4 rounded-full bg-accent text-accent-foreground text-[10px] font-bold flex items-center justify-center">
@@ -804,12 +985,18 @@ function NotificationBell() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 max-h-[480px] overflow-y-auto">
+      <DropdownMenuContent
+        align="end"
+        className="w-80 max-h-[480px] overflow-y-auto"
+      >
         <DropdownMenuLabel className="flex items-center justify-between sticky top-0 bg-popover z-10">
           <span>Notifications</span>
           {myNotifs.length > 0 && (
             <button
-              onClick={() => { setOpen(false); navigate("/notifications"); }}
+              onClick={() => {
+                setOpen(false);
+                navigate("/notifications");
+              }}
               className="text-xs text-primary hover:underline font-normal"
             >
               View all
@@ -820,7 +1007,9 @@ function NotificationBell() {
         {myNotifs.length === 0 ? (
           <div className="py-8 text-center">
             <Bell className="size-8 text-muted-foreground/30 mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No notifications yet</p>
+            <p className="text-sm text-muted-foreground">
+              No notifications yet
+            </p>
           </div>
         ) : (
           myNotifs.map((n) => {
@@ -830,16 +1019,24 @@ function NotificationBell() {
                 key={n.id}
                 className={`flex gap-3 px-3 py-3 border-b border-border/50 last:border-0 ${!n.is_read ? "bg-primary/5" : ""}`}
               >
-                <div className={`mt-0.5 shrink-0 size-7 rounded-full flex items-center justify-center ${!n.is_read ? "bg-primary/10" : "bg-muted"}`}>
-                  <Icon className={`size-3.5 ${!n.is_read ? "text-primary" : "text-muted-foreground"}`} />
+                <div
+                  className={`mt-0.5 shrink-0 size-7 rounded-full flex items-center justify-center ${!n.is_read ? "bg-primary/10" : "bg-muted"}`}
+                >
+                  <Icon
+                    className={`size-3.5 ${!n.is_read ? "text-primary" : "text-muted-foreground"}`}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs leading-relaxed text-foreground">{n.message}</p>
+                  <p className="text-xs leading-relaxed text-foreground">
+                    {n.message}
+                  </p>
                   <p className="text-[10px] text-muted-foreground font-mono mt-1">
                     {n.created_at.slice(0, 10)}
                   </p>
                 </div>
-                {!n.is_read && <span className="size-2 rounded-full bg-accent shrink-0 mt-1.5" />}
+                {!n.is_read && (
+                  <span className="size-2 rounded-full bg-accent shrink-0 mt-1.5" />
+                )}
               </div>
             );
           })
@@ -862,7 +1059,11 @@ function RoleSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5 text-xs border-border font-mono">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 text-xs border-border font-mono"
+        >
           <Settings className="size-3" />
           Demo Role
           <ChevronDown className="size-3 opacity-60" />
@@ -883,8 +1084,12 @@ function RoleSwitcher() {
             >
               <Icon className="size-3.5" />
               <div>
-                <div className="text-xs font-medium">{label}</div>
-                <div className="text-[10px] text-muted-foreground">{user?.name}</div>
+                <div className="text-xs font-medium">
+                  {label}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {user?.name}
+                </div>
               </div>
               {currentUser?.id === id && (
                 <CheckCircle2 className="size-3.5 ml-auto text-primary" />
@@ -914,7 +1119,8 @@ function NavLink({
 }) {
   const location = useLocation();
   const isActive =
-    location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
+    location.pathname === to ||
+    (to !== "/" && location.pathname.startsWith(to));
 
   return (
     <Link
@@ -940,21 +1146,26 @@ function NavLink({
   );
 }
 
-
 function SidebarContent({ onClose }: { onClose?: () => void }) {
-  const { currentUser, isStudent, isClubAdmin, isSuperAdmin } = useAuth();
+  const { currentUser, isStudent, isClubAdmin, isSuperAdmin } =
+    useAuth();
   const { store } = useData();
 
   const unread = store.notifications.filter(
-    (n) => n.user_id === currentUser?.id && !n.is_read
+    (n) => n.user_id === currentUser?.id && !n.is_read,
   ).length;
 
   const myClub = isClubAdmin
-    ? store.clubs.find((c) => c.admin_user_id === currentUser?.id)
+    ? store.clubs.find(
+        (c) => c.admin_user_id === currentUser?.id,
+      )
     : null;
 
   const pendingRequests = myClub
-    ? store.memberships.filter((m) => m.club_id === myClub.id && m.status === "pending").length
+    ? store.memberships.filter(
+        (m) =>
+          m.club_id === myClub.id && m.status === "pending",
+      ).length
     : 0;
 
   return (
@@ -965,7 +1176,10 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             <BookOpen className="size-4 text-sidebar-primary" />
           </div>
           <div>
-            <p className="text-sm font-bold text-sidebar-foreground leading-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
+            <p
+              className="text-sm font-bold text-sidebar-foreground leading-tight"
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+            >
               IUB Campus
             </p>
             <p className="text-[10px] text-sidebar-foreground/50 font-mono uppercase tracking-wide">
@@ -977,12 +1191,32 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {!isSuperAdmin && (
-          <NavLink to="/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onClose} />
+          <NavLink
+            to="/dashboard"
+            icon={LayoutDashboard}
+            label="Dashboard"
+            onClick={onClose}
+          />
         )}
-        <NavLink to="/events" icon={CalendarDays} label="Events" onClick={onClose} />
-        <NavLink to="/clubs" icon={Globe} label="Clubs" onClick={onClose} />
+        <NavLink
+          to="/events"
+          icon={CalendarDays}
+          label="Events"
+          onClick={onClose}
+        />
+        <NavLink
+          to="/clubs"
+          icon={Globe}
+          label="Clubs"
+          onClick={onClose}
+        />
         {isStudent && (
-          <NavLink to="/request-role" icon={BadgeCheck} label="Become an Organizer" onClick={onClose} />
+          <NavLink
+            to="/request-role"
+            icon={BadgeCheck}
+            label="Become an Organizer"
+            onClick={onClose}
+          />
         )}
         {isClubAdmin && myClub && (
           <>
@@ -991,8 +1225,18 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 Club Admin
               </p>
             </div>
-            <NavLink to="/admin/dashboard" icon={LayoutDashboard} label="Admin Dashboard" onClick={onClose} />
-            <NavLink to="/admin/events" icon={CalendarDays} label="Manage Events" onClick={onClose} />
+            <NavLink
+              to="/admin/dashboard"
+              icon={LayoutDashboard}
+              label="Admin Dashboard"
+              onClick={onClose}
+            />
+            <NavLink
+              to="/admin/events"
+              icon={CalendarDays}
+              label="Manage Events"
+              onClick={onClose}
+            />
             <NavLink
               to="/admin/requests"
               icon={UserCheck}
@@ -1000,7 +1244,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               badge={pendingRequests}
               onClick={onClose}
             />
-            <NavLink to="/admin/members" icon={Users} label="Member Roster" onClick={onClose} />
+            <NavLink
+              to="/admin/members"
+              icon={Users}
+              label="Member Roster"
+              onClick={onClose}
+            />
           </>
         )}
 
@@ -1011,7 +1260,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
                 Administration
               </p>
             </div>
-            <NavLink to="/superadmin" icon={Shield} label="Admin Console" onClick={onClose} />
+            <NavLink
+              to="/superadmin"
+              icon={Shield}
+              label="Admin Console"
+              onClick={onClose}
+            />
           </>
         )}
       </nav>
@@ -1024,8 +1278,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-sidebar-foreground truncate">{currentUser?.name}</p>
-            <p className="text-[10px] text-sidebar-foreground/50 font-mono truncate">{currentUser?.email}</p>
+            <p className="text-xs font-semibold text-sidebar-foreground truncate">
+              {currentUser?.name}
+            </p>
+            <p className="text-[10px] text-sidebar-foreground/50 font-mono truncate">
+              {currentUser?.email}
+            </p>
           </div>
         </div>
       </div>
@@ -1034,10 +1292,15 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
 }
 
 function TopBarUserMenu() {
-  const { currentUser, logout, isClubAdmin, isSuperAdmin } = useAuth();
+  const { currentUser, logout, isClubAdmin, isSuperAdmin } =
+    useAuth();
   const navigate = useNavigate();
 
-  const roleLabel = isSuperAdmin ? "Super Admin" : isClubAdmin ? "Club Admin" : "Student";
+  const roleLabel = isSuperAdmin
+    ? "Super Admin"
+    : isClubAdmin
+      ? "Club Admin"
+      : "Student";
 
   function handleLogout() {
     logout();
@@ -1061,7 +1324,9 @@ function TopBarUserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="px-3 py-2">
-          <p className="text-sm font-semibold truncate">{currentUser?.name}</p>
+          <p className="text-sm font-semibold truncate">
+            {currentUser?.name}
+          </p>
           <p className="text-[11px] text-muted-foreground font-mono truncate mt-0.5">
             {currentUser?.email}
           </p>
@@ -1075,7 +1340,10 @@ function TopBarUserMenu() {
           My Profile
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+        <DropdownMenuItem
+          onClick={handleLogout}
+          className="text-destructive focus:text-destructive"
+        >
           <ArrowLeft className="size-4 mr-2" />
           Log out
         </DropdownMenuItem>
@@ -1097,12 +1365,19 @@ function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="p-0 w-60 bg-sidebar border-sidebar-border">
+        <SheetContent
+          side="left"
+          className="p-0 w-60 bg-sidebar border-sidebar-border"
+        >
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation menu</SheetTitle>
-            <SheetDescription>Primary navigation links for IUB Campus Hub.</SheetDescription>
+            <SheetDescription>
+              Primary navigation links for IUB Campus Hub.
+            </SheetDescription>
           </SheetHeader>
-          <SidebarContent onClose={() => setMobileOpen(false)} />
+          <SidebarContent
+            onClose={() => setMobileOpen(false)}
+          />
         </SheetContent>
       </Sheet>
 
@@ -1123,7 +1398,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
             <TopBarUserMenu />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
       </div>
     </div>
   );
@@ -1140,8 +1417,10 @@ function ProtectedRoute({
 }) {
   const { currentUser, isClubAdmin, isSuperAdmin } = useAuth();
   if (!currentUser) return <Navigate to="/login" replace />;
-  if (role === "club_admin" && !isClubAdmin) return <Navigate to="/dashboard" replace />;
-  if (role === "super_admin" && !isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  if (role === "club_admin" && !isClubAdmin)
+    return <Navigate to="/dashboard" replace />;
+  if (role === "super_admin" && !isSuperAdmin)
+    return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -1274,7 +1553,9 @@ function LoginPage() {
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!email.endsWith("@iub.edu.bd")) {
-      toast.error("Invalid email", { description: "Use your @iub.edu.bd email address." });
+      toast.error("Invalid email", {
+        description: "Use your @iub.edu.bd email address.",
+      });
       return;
     }
     switchRole("user_1");
@@ -1290,14 +1571,22 @@ function LoginPage() {
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-6 lg:hidden">
               <BookOpen className="size-5 text-primary" />
-              <span style={{ fontFamily: "'Outfit', sans-serif" }} className="font-semibold text-primary">
+              <span
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+                className="font-semibold text-primary"
+              >
                 Campus Event &amp; Club Management
               </span>
             </div>
-            <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold text-foreground mb-1.5">
+            <h1
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="text-3xl font-semibold text-foreground mb-1.5"
+            >
               Welcome Back!
             </h1>
-            <p className="text-sm text-muted-foreground">Sign in to continue to your campus hub.</p>
+            <p className="text-sm text-muted-foreground">
+              Sign in to continue to your campus hub.
+            </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -1315,7 +1604,10 @@ function LoginPage() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-primary hover:underline"
+                >
                   Forgot password?
                 </Link>
               </div>
@@ -1328,7 +1620,10 @@ function LoginPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+            <Button
+              type="submit"
+              className="w-full bg-primary hover:bg-primary/90"
+            >
               Login
             </Button>
           </form>
@@ -1355,7 +1650,10 @@ function LoginPage() {
 
           <p className="text-sm text-center text-muted-foreground mt-6">
             {"Don't have an account? "}
-            <Link to="/register" className="text-primary hover:underline font-medium">
+            <Link
+              to="/register"
+              className="text-primary hover:underline font-medium"
+            >
               Sign up
             </Link>
           </p>
@@ -1366,9 +1664,21 @@ function LoginPage() {
             </p>
             <div className="space-y-2">
               {[
-                { label: "Student", id: "user_1", email: "anika.rahman@iub.edu.bd" },
-                { label: "Club Admin", id: "user_2", email: "shoikat.azad@iub.edu.bd" },
-                { label: "Super Admin", id: "user_3", email: "admin@iub.edu.bd" },
+                {
+                  label: "Student",
+                  id: "user_1",
+                  email: "anika.rahman@iub.edu.bd",
+                },
+                {
+                  label: "Club Admin",
+                  id: "user_2",
+                  email: "shoikat.azad@iub.edu.bd",
+                },
+                {
+                  label: "Super Admin",
+                  id: "user_3",
+                  email: "admin@iub.edu.bd",
+                },
               ].map((u) => (
                 <Button
                   key={u.id}
@@ -1379,8 +1689,12 @@ function LoginPage() {
                     navigate("/dashboard");
                   }}
                 >
-                  <span className="font-medium">{u.label}:</span>
-                  <span className="text-muted-foreground font-mono">{u.email}</span>
+                  <span className="font-medium">
+                    {u.label}:
+                  </span>
+                  <span className="text-muted-foreground font-mono">
+                    {u.email}
+                  </span>
                 </Button>
               ))}
             </div>
@@ -1409,12 +1723,15 @@ function RegisterPage() {
     e.preventDefault();
     if (!form.email.endsWith("@iub.edu.bd")) {
       toast.error("Invalid email", {
-        description: "Registration requires a valid @iub.edu.bd email.",
+        description:
+          "Registration requires a valid @iub.edu.bd email.",
       });
       return;
     }
     if (form.password.length < 8) {
-      toast.error("Weak password", { description: "Password must be at least 8 characters." });
+      toast.error("Weak password", {
+        description: "Password must be at least 8 characters.",
+      });
       return;
     }
     const userId = doRegisterUser({
@@ -1425,7 +1742,8 @@ function RegisterPage() {
     });
     switchRole(userId);
     toast.success("Account created!", {
-      description: "Welcome to IUB Campus Hub. You're signed in as a student.",
+      description:
+        "Welcome to IUB Campus Hub. You're signed in as a student.",
     });
     navigate("/dashboard");
   }
@@ -1436,98 +1754,141 @@ function RegisterPage() {
 
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-sm">
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-6 lg:hidden">
-            <BookOpen className="size-5 text-primary" />
-            <span style={{ fontFamily: "'Outfit', sans-serif" }} className="font-semibold text-primary">
-              Campus Event &amp; Club Management
-            </span>
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-6 lg:hidden">
+              <BookOpen className="size-5 text-primary" />
+              <span
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+                className="font-semibold text-primary"
+              >
+                Campus Event &amp; Club Management
+              </span>
+            </div>
+            <h1
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="text-3xl font-semibold mb-1.5"
+            >
+              Create Account
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Join your campus hub with your IUB email.
+            </p>
           </div>
-          <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold mb-1.5">
-            Create Account
-          </h1>
-          <p className="text-sm text-muted-foreground">Join your campus hub with your IUB email.</p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Full Name</Label>
-            <Input
-              placeholder="e.g. Anika Rahman"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>IUB Email</Label>
-            <Input
-              type="email"
-              placeholder="yourname@iub.edu.bd"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              required
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Student ID</Label>
+              <Label>Full Name</Label>
               <Input
-                placeholder="e.g. 2321200"
-                value={form.studentId}
-                onChange={(e) => setForm({ ...form, studentId: e.target.value })}
+                placeholder="e.g. Anika Rahman"
+                value={form.name}
+                onChange={(e) =>
+                  setForm({ ...form, name: e.target.value })
+                }
                 required
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Department</Label>
-              <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {["CSE", "EEE", "BBA", "MBA", "ECO", "PHY", "ENG", "SOC"].map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>IUB Email</Label>
+              <Input
+                type="email"
+                placeholder="yourname@iub.edu.bd"
+                value={form.email}
+                onChange={(e) =>
+                  setForm({ ...form, email: e.target.value })
+                }
+                required
+              />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Student ID</Label>
+                <Input
+                  placeholder="e.g. 2321200"
+                  value={form.studentId}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      studentId: e.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Department</Label>
+                <Select
+                  value={form.department}
+                  onValueChange={(v) =>
+                    setForm({ ...form, department: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[
+                      "CSE",
+                      "EEE",
+                      "BBA",
+                      "MBA",
+                      "ECO",
+                      "PHY",
+                      "ENG",
+                      "SOC",
+                    ].map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                placeholder="Min. 8 characters"
+                value={form.password}
+                onChange={(e) =>
+                  setForm({ ...form, password: e.target.value })
+                }
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              Create Account
+            </Button>
+          </form>
+
+          <div className="my-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
+              or
+            </span>
+            <div className="h-px flex-1 bg-border" />
           </div>
-          <div className="space-y-1.5">
-            <Label>Password</Label>
-            <Input
-              type="password"
-              placeholder="Min. 8 characters"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required
-            />
-          </div>
-          <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
-            Create Account
+
+          <Button
+            variant="outline"
+            className="w-full gap-2.5 font-normal"
+            onClick={() => navigate("/login")}
+          >
+            <GoogleIcon className="size-4" />
+            Sign up with Google
           </Button>
-        </form>
 
-        <div className="my-6 flex items-center gap-3">
-          <div className="h-px flex-1 bg-border" />
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono">
-            or
-          </span>
-          <div className="h-px flex-1 bg-border" />
-        </div>
-
-        <Button variant="outline" className="w-full gap-2.5 font-normal" onClick={() => navigate("/login")}>
-          <GoogleIcon className="size-4" />
-          Sign up with Google
-        </Button>
-
-        <p className="text-sm text-center text-muted-foreground mt-6">
-          Already have an account?{" "}
-          <Link to="/login" className="text-primary hover:underline font-medium">
-            Sign in
-          </Link>
-        </p>
+          <p className="text-sm text-center text-muted-foreground mt-6">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-primary hover:underline font-medium"
+            >
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
     </div>
@@ -1544,11 +1905,15 @@ function ForgotPasswordPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.endsWith("@iub.edu.bd")) {
-      toast.error("Invalid email", { description: "Please enter your @iub.edu.bd email." });
+      toast.error("Invalid email", {
+        description: "Please enter your @iub.edu.bd email.",
+      });
       return;
     }
     setSent(true);
-    toast.success("OTP sent", { description: "Check your IUB inbox for the reset code." });
+    toast.success("OTP sent", {
+      description: "Check your IUB inbox for the reset code.",
+    });
   }
 
   return (
@@ -1560,7 +1925,10 @@ function ForgotPasswordPage() {
         >
           <ArrowLeft className="size-4" /> Back to login
         </button>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-semibold mb-1">
+        <h1
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+          className="text-2xl font-semibold mb-1"
+        >
           Reset password
         </h1>
         <p className="text-sm text-muted-foreground mb-6">
@@ -1575,7 +1943,10 @@ function ForgotPasswordPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+            <Button
+              type="submit"
+              className="w-full bg-primary hover:bg-primary/90"
+            >
               Send reset OTP
             </Button>
           </form>
@@ -1584,13 +1955,21 @@ function ForgotPasswordPage() {
             <div className="rounded-lg bg-quaternary/10 border border-quaternary/30 p-4 flex gap-3">
               <CheckCircle2 className="size-5 text-quaternary shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-foreground">OTP sent!</p>
+                <p className="text-sm font-medium text-foreground">
+                  OTP sent!
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  We sent a 6-digit code to <strong>{email}</strong>. Expires in 10 minutes.
+                  We sent a 6-digit code to{" "}
+                  <strong>{email}</strong>. Expires in 10
+                  minutes.
                 </p>
               </div>
             </div>
-            <Button variant="outline" className="w-full" onClick={() => navigate("/login")}>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => navigate("/login")}
+            >
               Back to login
             </Button>
           </div>
@@ -1608,28 +1987,39 @@ function DashboardPage() {
   const navigate = useNavigate();
 
   // Super admins have no student dashboard — the Admin Console is their home.
-  if (isSuperAdmin) return <Navigate to="/superadmin" replace />;
+  if (isSuperAdmin)
+    return <Navigate to="/superadmin" replace />;
 
-  const myRegs = store.registrations.filter((r) => r.user_id === currentUser?.id);
-  const myRegistered = myRegs.filter((r) => r.status === "registered");
-  const myWaitlisted = myRegs.filter((r) => r.status === "waitlisted");
+  const myRegs = store.registrations.filter(
+    (r) => r.user_id === currentUser?.id,
+  );
+  const myRegistered = myRegs.filter(
+    (r) => r.status === "registered",
+  );
+  const myWaitlisted = myRegs.filter(
+    (r) => r.status === "waitlisted",
+  );
 
   const upcomingEvents = myRegistered
     .map((r) => store.events.find((e) => e.id === r.event_id))
     .filter(Boolean)
-    .filter((e) => e!.status !== "cancelled" && !isPast(parseISO(e!.date)))
+    .filter(
+      (e) =>
+        e!.status !== "cancelled" && !isPast(parseISO(e!.date)),
+    )
     .sort((a, b) => a!.date.localeCompare(b!.date))
     .slice(0, 3) as Event[];
 
   const myMemberships = store.memberships.filter(
-    (m) => m.user_id === currentUser?.id && m.status === "approved"
+    (m) =>
+      m.user_id === currentUser?.id && m.status === "approved",
   );
   const myClubs = myMemberships
     .map((m) => store.clubs.find((c) => c.id === m.club_id))
     .filter(Boolean) as Club[];
 
   const unread = store.notifications.filter(
-    (n) => n.user_id === currentUser?.id && !n.is_read
+    (n) => n.user_id === currentUser?.id && !n.is_read,
   ).length;
 
   return (
@@ -1639,34 +2029,74 @@ function DashboardPage() {
           <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
             Welcome back
           </p>
-          <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold text-foreground">
+          <h1
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-3xl font-semibold text-foreground"
+          >
             {currentUser?.name?.split(" ")[0]}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {currentUser?.department} · {currentUser?.student_id}
+            {currentUser?.department} ·{" "}
+            {currentUser?.student_id}
           </p>
         </div>
-        <Button variant="outline" size="sm" className="shrink-0" onClick={doSendDigest}>
-          <MailCheck className="size-4 mr-2" /> Email me a digest
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={doSendDigest}
+        >
+          <MailCheck className="size-4 mr-2" /> Email me a
+          digest
         </Button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={CalendarCheck} label="Registered" value={myRegistered.length} sub="upcoming events" />
-        <StatCard icon={Hourglass} label="Waitlisted" value={myWaitlisted.length} color="accent" />
-        <StatCard icon={Users} label="Clubs Joined" value={myClubs.length} color="green" />
+        <StatCard
+          icon={CalendarCheck}
+          label="Registered"
+          value={myRegistered.length}
+          sub="upcoming events"
+        />
+        <StatCard
+          icon={Hourglass}
+          label="Waitlisted"
+          value={myWaitlisted.length}
+          color="accent"
+        />
+        <StatCard
+          icon={Users}
+          label="Clubs Joined"
+          value={myClubs.length}
+          color="green"
+        />
         {unread > 0 && (
-          <StatCard icon={Bell} label="Unread" value={unread} sub="notifications" color="purple" />
+          <StatCard
+            icon={Bell}
+            label="Unread"
+            value={unread}
+            sub="notifications"
+            color="purple"
+          />
         )}
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-semibold">
+          <h2
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-lg font-semibold"
+          >
             Your Upcoming Events
           </h2>
-          <Button variant="ghost" size="sm" className="text-primary text-xs" onClick={() => navigate("/events")}>
-            Browse all <ChevronRight className="size-3.5 ml-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-primary text-xs"
+            onClick={() => navigate("/events")}
+          >
+            Browse all{" "}
+            <ChevronRight className="size-3.5 ml-1" />
           </Button>
         </div>
         {upcomingEvents.length === 0 ? (
@@ -1674,7 +2104,14 @@ function DashboardPage() {
             icon={CalendarDays}
             title="No upcoming events"
             description="You haven't registered for any events yet."
-            action={<Button size="sm" onClick={() => navigate("/events")}>Explore events</Button>}
+            action={
+              <Button
+                size="sm"
+                onClick={() => navigate("/events")}
+              >
+                Explore events
+              </Button>
+            }
           />
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1687,27 +2124,40 @@ function DashboardPage() {
 
       {myWaitlisted.length > 0 && (
         <div>
-          <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-semibold mb-4">
+          <h2
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-lg font-semibold mb-4"
+          >
             Waitlisted Events
           </h2>
           <div className="space-y-2">
             {myWaitlisted.map((r) => {
-              const event = store.events.find((e) => e.id === r.event_id);
+              const event = store.events.find(
+                (e) => e.id === r.event_id,
+              );
               if (!event) return null;
               return (
                 <div
                   key={r.id}
-                  onClick={() => navigate(`/events/${event.id}`)}
+                  onClick={() =>
+                    navigate(`/events/${event.id}`)
+                  }
                   className="flex items-center gap-4 p-3 bg-card border border-border rounded-lg hover:border-primary/30 cursor-pointer transition-colors"
                 >
                   <Hourglass className="size-4 text-accent shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium line-clamp-1">{event.title}</p>
+                    <p className="text-sm font-medium line-clamp-1">
+                      {event.title}
+                    </p>
                     <p className="text-xs text-muted-foreground font-mono">
-                      {format(parseISO(event.date), "d MMM")} · {event.start_time}
+                      {format(parseISO(event.date), "d MMM")} ·{" "}
+                      {event.start_time}
                     </p>
                   </div>
-                  <Badge variant="outline" className="text-foreground border-accent/50 bg-accent/10 text-[10px] font-mono shrink-0">
+                  <Badge
+                    variant="outline"
+                    className="text-foreground border-accent/50 bg-accent/10 text-[10px] font-mono shrink-0"
+                  >
                     Waitlisted
                   </Badge>
                 </div>
@@ -1719,10 +2169,18 @@ function DashboardPage() {
 
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-semibold">
+          <h2
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-lg font-semibold"
+          >
             My Clubs
           </h2>
-          <Button variant="ghost" size="sm" className="text-primary text-xs" onClick={() => navigate("/clubs")}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-primary text-xs"
+            onClick={() => navigate("/clubs")}
+          >
             All clubs <ChevronRight className="size-3.5 ml-1" />
           </Button>
         </div>
@@ -1732,7 +2190,11 @@ function DashboardPage() {
             title="No club memberships"
             description="Join a club to connect with fellow students."
             action={
-              <Button size="sm" variant="outline" onClick={() => navigate("/clubs")}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate("/clubs")}
+              >
                 Browse clubs
               </Button>
             }
@@ -1768,10 +2230,14 @@ function EventFeedPage() {
         e.tags.some((t) => t.toLowerCase().includes(q))
       );
     })
-    .filter((e) => clubFilter === "all" || e.club_id === clubFilter)
+    .filter(
+      (e) => clubFilter === "all" || e.club_id === clubFilter,
+    )
     .filter((e) => {
-      if (statusFilter === "available") return e.registered_count < e.capacity;
-      if (statusFilter === "full") return e.registered_count >= e.capacity;
+      if (statusFilter === "available")
+        return e.registered_count < e.capacity;
+      if (statusFilter === "full")
+        return e.registered_count >= e.capacity;
       return true;
     })
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -1779,12 +2245,18 @@ function EventFeedPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">Discover</p>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold">
+        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+          Discover
+        </p>
+        <h1
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+          className="text-3xl font-semibold"
+        >
           Campus Events
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {events.length} upcoming event{events.length !== 1 ? "s" : ""}
+          {events.length} upcoming event
+          {events.length !== 1 ? "s" : ""}
         </p>
       </div>
 
@@ -1798,7 +2270,10 @@ function EventFeedPage() {
             className="pl-9 bg-card border-border"
           />
         </div>
-        <Select value={clubFilter} onValueChange={setClubFilter}>
+        <Select
+          value={clubFilter}
+          onValueChange={setClubFilter}
+        >
           <SelectTrigger className="w-[180px] bg-card border-border">
             <SelectValue placeholder="All clubs" />
           </SelectTrigger>
@@ -1811,20 +2286,29 @@ function EventFeedPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+        >
           <SelectTrigger className="w-[140px] bg-card border-border">
             <SelectValue placeholder="Availability" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="available">Available</SelectItem>
-            <SelectItem value="full">Full (Waitlist)</SelectItem>
+            <SelectItem value="full">
+              Full (Waitlist)
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {events.length === 0 ? (
-        <EmptyState icon={CalendarDays} title="No events found" description="Try adjusting your search or filters." />
+        <EmptyState
+          icon={CalendarDays}
+          title="No events found"
+          description="Try adjusting your search or filters."
+        />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {events.map((e) => (
@@ -1840,27 +2324,35 @@ function EventFeedPage() {
 
 function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { store, doRegister, doCancel, doToggleException } = useData();
+  const { store, doRegister, doCancel, doToggleException } =
+    useData();
   const { currentUser, isClubAdmin } = useAuth();
   const navigate = useNavigate();
 
   const event = store.events.find((e) => e.id === id);
   const club = store.clubs.find((c) => c.id === event?.club_id);
   const myReg = store.registrations.find(
-    (r) => r.user_id === currentUser?.id && r.event_id === id
+    (r) => r.user_id === currentUser?.id && r.event_id === id,
   );
-  const isAdmin = isClubAdmin && club?.admin_user_id === currentUser?.id;
+  const isAdmin =
+    isClubAdmin && club?.admin_user_id === currentUser?.id;
 
   if (!event) {
     return (
       <div className="p-6">
-        <EmptyState icon={AlertCircle} title="Event not found" description="This event may have been removed." />
+        <EmptyState
+          icon={AlertCircle}
+          title="Event not found"
+          description="This event may have been removed."
+        />
       </div>
     );
   }
 
   const isFull = event.registered_count >= event.capacity;
-  const isEventPast = isPast(parseISO(`${event.date}T${event.end_time}`));
+  const isEventPast = isPast(
+    parseISO(`${event.date}T${event.end_time}`),
+  );
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -1880,7 +2372,9 @@ function EventDetailPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         {event.status === "cancelled" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-            <Badge className="bg-destructive text-white text-sm px-4 py-1.5">Event Cancelled</Badge>
+            <Badge className="bg-destructive text-white text-sm px-4 py-1.5">
+              Event Cancelled
+            </Badge>
           </div>
         )}
         <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
@@ -1898,23 +2392,52 @@ function EventDetailPage() {
       <div className="grid lg:grid-cols-[1fr_300px] gap-8">
         <div className="space-y-6">
           <div>
-            <p className="text-xs font-mono text-muted-foreground mb-1">{club?.name}</p>
-            <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold leading-snug">
+            <p className="text-xs font-mono text-muted-foreground mb-1">
+              {club?.name}
+            </p>
+            <h1
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="text-3xl font-semibold leading-snug"
+            >
               {event.title}
             </h1>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { icon: CalendarDays, label: "Date", value: format(parseISO(event.date), "EEEE, d MMMM yyyy") },
-              { icon: Clock, label: "Time", value: `${event.start_time} – ${event.end_time}` },
-              { icon: MapPin, label: "Venue", value: event.venue },
-              { icon: Users, label: "Capacity", value: `${event.capacity} seats` },
+              {
+                icon: CalendarDays,
+                label: "Date",
+                value: format(
+                  parseISO(event.date),
+                  "EEEE, d MMMM yyyy",
+                ),
+              },
+              {
+                icon: Clock,
+                label: "Time",
+                value: `${event.start_time} – ${event.end_time}`,
+              },
+              {
+                icon: MapPin,
+                label: "Venue",
+                value: event.venue,
+              },
+              {
+                icon: Users,
+                label: "Capacity",
+                value: `${event.capacity} seats`,
+              },
             ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="flex gap-3 p-3 bg-card border border-border rounded-lg">
+              <div
+                key={label}
+                className="flex gap-3 p-3 bg-card border border-border rounded-lg"
+              >
                 <Icon className="size-4 text-muted-foreground shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs text-muted-foreground font-mono">{label}</p>
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {label}
+                  </p>
                   <p className="text-sm font-medium">{value}</p>
                 </div>
               </div>
@@ -1924,7 +2447,10 @@ function EventDetailPage() {
           <Separator />
 
           <div>
-            <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="font-semibold text-lg mb-3">
+            <h2
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="font-semibold text-lg mb-3"
+            >
               About this event
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
@@ -1937,10 +2463,16 @@ function EventDetailPage() {
               <Separator className="mb-6" />
               <div className="flex items-center gap-2 mb-3">
                 <Repeat className="size-4 text-primary" />
-                <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="font-semibold text-lg">
+                <h2
+                  style={{ fontFamily: "'Outfit', sans-serif" }}
+                  className="font-semibold text-lg"
+                >
                   Schedule
                 </h2>
-                <Badge variant="outline" className="text-xs font-mono">
+                <Badge
+                  variant="outline"
+                  className="text-xs font-mono"
+                >
                   {recurrenceLabel(event)}
                 </Badge>
               </div>
@@ -1955,20 +2487,28 @@ function EventDetailPage() {
                     }`}
                   >
                     <span className="text-sm font-medium">
-                      {format(parseISO(occ.date), "EEE, d MMM yyyy")}
+                      {format(
+                        parseISO(occ.date),
+                        "EEE, d MMM yyyy",
+                      )}
                     </span>
                     {isAdmin ? (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-7 text-xs no-underline"
-                        onClick={() => doToggleException(event.id, occ.date)}
+                        onClick={() =>
+                          doToggleException(event.id, occ.date)
+                        }
                       >
                         {occ.skipped ? "Restore" : "Cancel"}
                       </Button>
                     ) : (
                       occ.skipped && (
-                        <Badge variant="outline" className="text-xs font-mono text-destructive border-destructive/30">
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-mono text-destructive border-destructive/30"
+                        >
                           Cancelled
                         </Badge>
                       )
@@ -1984,14 +2524,18 @@ function EventDetailPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(`/admin/events/edit/${event.id}`)}
+                onClick={() =>
+                  navigate(`/admin/events/edit/${event.id}`)
+                }
               >
                 <Edit3 className="size-3.5 mr-1.5" /> Edit Event
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(`/admin/events/${event.id}/roster`)}
+                onClick={() =>
+                  navigate(`/admin/events/${event.id}/roster`)
+                }
               >
                 <List className="size-3.5 mr-1.5" /> View Roster
               </Button>
@@ -2003,19 +2547,30 @@ function EventDetailPage() {
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div>
               <div className="flex justify-between items-center mb-2">
-                <p className="text-sm font-semibold">Availability</p>
+                <p className="text-sm font-semibold">
+                  Availability
+                </p>
                 {isFull && (
-                  <Badge variant="outline" className="text-destructive border-destructive/30 text-xs font-mono">
+                  <Badge
+                    variant="outline"
+                    className="text-destructive border-destructive/30 text-xs font-mono"
+                  >
                     Full
                   </Badge>
                 )}
                 {!isFull && event.waitlisted_count > 0 && (
-                  <Badge variant="outline" className="text-foreground border-accent/50 text-xs font-mono">
+                  <Badge
+                    variant="outline"
+                    className="text-foreground border-accent/50 text-xs font-mono"
+                  >
                     {event.waitlisted_count} waitlisted
                   </Badge>
                 )}
               </div>
-              <CapacityBar registered={event.registered_count} capacity={event.capacity} />
+              <CapacityBar
+                registered={event.registered_count}
+                capacity={event.capacity}
+              />
             </div>
 
             <Separator />
@@ -2039,40 +2594,52 @@ function EventDetailPage() {
                 >
                   {myReg.status === "registered" ? (
                     <span className="flex items-center justify-center gap-1.5">
-                      <CheckCircle2 className="size-4" /> You are registered
+                      <CheckCircle2 className="size-4" /> You
+                      are registered
                     </span>
                   ) : (
                     <span className="flex items-center justify-center gap-1.5">
-                      <Hourglass className="size-4" /> You are on the waitlist
+                      <Hourglass className="size-4" /> You are
+                      on the waitlist
                     </span>
                   )}
                 </div>
                 {myReg.status === "registered" &&
                   (myReg.checked_in ? (
                     <div className="rounded-md bg-quaternary/15 border border-quaternary/40 p-3 text-xs text-foreground text-center font-medium flex items-center justify-center gap-1.5">
-                      <BadgeCheck className="size-4" /> Checked in
+                      <BadgeCheck className="size-4" /> Checked
+                      in
                       {myReg.checked_in_at &&
                         ` · ${format(parseISO(myReg.checked_in_at), "d MMM, HH:mm")}`}
                     </div>
                   ) : (
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="outline" className="w-full">
-                          <Ticket className="size-4 mr-2" /> Show Check-in QR
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <Ticket className="size-4 mr-2" />{" "}
+                          Show Check-in QR
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-sm">
                         <DialogHeader>
-                          <DialogTitle>Your check-in ticket</DialogTitle>
+                          <DialogTitle>
+                            Your check-in ticket
+                          </DialogTitle>
                           <DialogDescription>
-                            Present this QR code at the event entrance for contactless
-                            check-in.
+                            Present this QR code at the event
+                            entrance for contactless check-in.
                           </DialogDescription>
                         </DialogHeader>
                         <div className="flex flex-col items-center gap-4 py-4">
                           <div className="bg-white p-4 rounded-xl border-2 border-border">
                             <QRCodeSVG
-                              value={checkInCode(event.id, myReg.id)}
+                              value={checkInCode(
+                                event.id,
+                                myReg.id,
+                              )}
                               size={200}
                               level="M"
                             />
@@ -2095,7 +2662,9 @@ function EventDetailPage() {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Cancel registration?</DialogTitle>
+                      <DialogTitle>
+                        Cancel registration?
+                      </DialogTitle>
                       <DialogDescription>
                         {myReg.status === "waitlisted"
                           ? "You will lose your waitlist spot."
@@ -2103,7 +2672,9 @@ function EventDetailPage() {
                       </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                      <Button variant="outline">Keep my spot</Button>
+                      <Button variant="outline">
+                        Keep my spot
+                      </Button>
                       <Button
                         variant="destructive"
                         onClick={() => {
@@ -2120,13 +2691,15 @@ function EventDetailPage() {
             ) : isFull ? (
               <div className="space-y-3">
                 <div className="rounded-md bg-accent/10 border border-accent/30 p-3 text-xs text-foreground text-center">
-                  This event is full. Join the waitlist and you'll be notified if a spot opens.
+                  This event is full. Join the waitlist and
+                  you'll be notified if a spot opens.
                 </div>
                 <Button
                   className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
                   onClick={() => doRegister(event.id)}
                 >
-                  <Hourglass className="size-4 mr-2" /> Join Waitlist
+                  <Hourglass className="size-4 mr-2" /> Join
+                  Waitlist
                 </Button>
               </div>
             ) : (
@@ -2140,24 +2713,41 @@ function EventDetailPage() {
           </div>
 
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-            <p className="text-xs font-mono text-muted-foreground">Add & share</p>
+            <p className="text-xs font-mono text-muted-foreground">
+              Add & share
+            </p>
             <div className="grid grid-cols-1 gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    <CalendarPlus className="size-4 mr-2" /> Add to Calendar
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                  >
+                    <CalendarPlus className="size-4 mr-2" /> Add
+                    to Calendar
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuContent
+                  align="start"
+                  className="w-56"
+                >
                   <DropdownMenuItem
                     onClick={() =>
-                      window.open(googleCalendarUrl(event, club), "_blank", "noopener")
+                      window.open(
+                        googleCalendarUrl(event, club),
+                        "_blank",
+                        "noopener",
+                      )
                     }
                   >
-                    <CalendarDays className="size-4 mr-2" /> Google Calendar
+                    <CalendarDays className="size-4 mr-2" />{" "}
+                    Google Calendar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => downloadICS(event, club)}>
-                    <Download className="size-4 mr-2" /> Download .ics
+                  <DropdownMenuItem
+                    onClick={() => downloadICS(event, club)}
+                  >
+                    <Download className="size-4 mr-2" />{" "}
+                    Download .ics
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -2168,11 +2758,13 @@ function EventDetailPage() {
                   const result = await shareEvent(event);
                   if (result === "copied")
                     toast.success("Link copied", {
-                      description: "Event link copied to your clipboard.",
+                      description:
+                        "Event link copied to your clipboard.",
                     });
                   else if (result === "failed")
                     toast.error("Couldn't share", {
-                      description: "Please copy the page URL manually.",
+                      description:
+                        "Please copy the page URL manually.",
                     });
                 }}
               >
@@ -2182,7 +2774,9 @@ function EventDetailPage() {
           </div>
 
           <div className="bg-card border border-border rounded-xl p-4">
-            <p className="text-xs font-mono text-muted-foreground mb-2">Organised by</p>
+            <p className="text-xs font-mono text-muted-foreground mb-2">
+              Organised by
+            </p>
             <div
               className="flex items-center gap-3 cursor-pointer hover:text-primary transition-colors"
               onClick={() => navigate(`/clubs/${club?.id}`)}
@@ -2195,7 +2789,9 @@ function EventDetailPage() {
                 />
               </div>
               <div>
-                <p className="text-sm font-semibold">{club?.name}</p>
+                <p className="text-sm font-semibold">
+                  {club?.name}
+                </p>
                 <p className="text-xs text-muted-foreground font-mono">
                   {club?.member_count?.toLocaleString()} members
                 </p>
@@ -2215,22 +2811,37 @@ function ClubDirectoryPage() {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
 
-  const categories = Array.from(new Set(store.clubs.map((c) => c.category)));
+  const categories = Array.from(
+    new Set(store.clubs.map((c) => c.category)),
+  );
   const clubs = store.clubs
     .filter((c) => {
       const q = search.toLowerCase();
-      return !q || c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q);
+      return (
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q)
+      );
     })
-    .filter((c) => catFilter === "all" || c.category === catFilter);
+    .filter(
+      (c) => catFilter === "all" || c.category === catFilter,
+    );
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">Explore</p>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold">
+        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+          Explore
+        </p>
+        <h1
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+          className="text-3xl font-semibold"
+        >
           Club Directory
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">{clubs.length} clubs</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {clubs.length} clubs
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6">
@@ -2259,7 +2870,11 @@ function ClubDirectoryPage() {
       </div>
 
       {clubs.length === 0 ? (
-        <EmptyState icon={Users} title="No clubs found" description="Try a different search." />
+        <EmptyState
+          icon={Users}
+          title="No clubs found"
+          description="Try a different search."
+        />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {clubs.map((c) => (
@@ -2281,7 +2896,7 @@ function ClubDetailPage() {
 
   const club = store.clubs.find((c) => c.id === id);
   const membership = store.memberships.find(
-    (m) => m.user_id === currentUser?.id && m.club_id === id
+    (m) => m.user_id === currentUser?.id && m.club_id === id,
   );
   const clubEvents = store.events
     .filter((e) => e.club_id === id && e.status === "published")
@@ -2289,14 +2904,23 @@ function ClubDetailPage() {
 
   const clubMembers = store.memberships
     .filter((m) => m.club_id === id && m.status === "approved")
-    .map((m) => ({ ...m, user: store.users.find((u) => u.id === m.user_id) }));
+    .map((m) => ({
+      ...m,
+      user: store.users.find((u) => u.id === m.user_id),
+    }));
 
-  const adminUser = store.users.find((u) => u.id === club?.admin_user_id);
+  const adminUser = store.users.find(
+    (u) => u.id === club?.admin_user_id,
+  );
 
   if (!club) {
     return (
       <div className="p-6">
-        <EmptyState icon={AlertCircle} title="Club not found" description="" />
+        <EmptyState
+          icon={AlertCircle}
+          title="Club not found"
+          description=""
+        />
       </div>
     );
   }
@@ -2318,7 +2942,9 @@ function ClubDetailPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         <div className="absolute bottom-4 left-5">
-          <span className={`text-[11px] font-mono font-medium px-2.5 py-0.5 rounded border ${categoryColor(club.category)}`}>
+          <span
+            className={`text-[11px] font-mono font-medium px-2.5 py-0.5 rounded border ${categoryColor(club.category)}`}
+          >
             {club.category}
           </span>
         </div>
@@ -2327,29 +2953,41 @@ function ClubDetailPage() {
       <div className="grid lg:grid-cols-[1fr_280px] gap-8">
         <div className="space-y-6">
           <div>
-            <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold">
+            <h1
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="text-3xl font-semibold"
+            >
               {club.name}
             </h1>
             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground font-mono">
               <span className="flex items-center gap-1">
-                <Users className="size-3.5" /> {club.member_count}
+                <Users className="size-3.5" />{" "}
+                {club.member_count}
               </span>
               <span className="flex items-center gap-1">
-                <CalendarDays className="size-3.5" /> Est. {club.founded}
+                <CalendarDays className="size-3.5" /> Est.{" "}
+                {club.founded}
               </span>
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground leading-relaxed">{club.description}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {club.description}
+          </p>
 
           <Separator />
 
           <div>
-            <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="font-semibold text-lg mb-4">
+            <h2
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="font-semibold text-lg mb-4"
+            >
               Upcoming Events
             </h2>
             {clubEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No upcoming events.</p>
+              <p className="text-sm text-muted-foreground">
+                No upcoming events.
+              </p>
             ) : (
               <div className="grid sm:grid-cols-2 gap-4">
                 {clubEvents.slice(0, 4).map((e) => (
@@ -2363,25 +3001,37 @@ function ClubDetailPage() {
             <>
               <Separator />
               <div>
-                <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="font-semibold text-lg mb-4">
+                <h2
+                  style={{ fontFamily: "'Outfit', sans-serif" }}
+                  className="font-semibold text-lg mb-4"
+                >
                   Members
                 </h2>
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {clubMembers.slice(0, 6).map(({ user, role }) =>
-                    user ? (
-                      <div key={user.id} className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg">
-                        <Avatar className="size-8">
-                          <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-                            {getInitials(user.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-medium">{user.name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{role ?? "Member"}</p>
+                  {clubMembers
+                    .slice(0, 6)
+                    .map(({ user, role }) =>
+                      user ? (
+                        <div
+                          key={user.id}
+                          className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg"
+                        >
+                          <Avatar className="size-8">
+                            <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                              {getInitials(user.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {user.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground font-mono">
+                              {role ?? "Member"}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ) : null
-                  )}
+                      ) : null,
+                    )}
                 </div>
               </div>
             </>
@@ -2390,35 +3040,44 @@ function ClubDetailPage() {
 
         <div className="space-y-4">
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <h3 className="font-semibold text-sm">Membership</h3>
+            <h3 className="font-semibold text-sm">
+              Membership
+            </h3>
             {membership ? (
               <div
                 className={`rounded-md p-3 text-sm text-center font-medium ${
                   membership.status === "approved"
                     ? "bg-quaternary/10 text-foreground border border-quaternary/30"
                     : membership.status === "pending"
-                    ? "bg-accent/10 text-foreground border border-accent/30"
-                    : "bg-destructive/8 text-destructive border border-destructive/20"
+                      ? "bg-accent/10 text-foreground border border-accent/30"
+                      : "bg-destructive/8 text-destructive border border-destructive/20"
                 }`}
               >
                 {membership.status === "approved" && (
                   <span className="flex items-center justify-center gap-1.5">
-                    <BadgeCheck className="size-4" /> You are a member
+                    <BadgeCheck className="size-4" /> You are a
+                    member
                   </span>
                 )}
                 {membership.status === "pending" && (
                   <span className="flex items-center justify-center gap-1.5">
-                    <Hourglass className="size-4" /> Application pending
+                    <Hourglass className="size-4" /> Application
+                    pending
                   </span>
                 )}
-                {membership.status === "rejected" && "Application rejected"}
+                {membership.status === "rejected" &&
+                  "Application rejected"}
               </div>
             ) : (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Join this club to participate in events and connect with members.
+                  Join this club to participate in events and
+                  connect with members.
                 </p>
-                <Button className="w-full bg-primary hover:bg-primary/90" onClick={() => doApplyClub(club.id)}>
+                <Button
+                  className="w-full bg-primary hover:bg-primary/90"
+                  onClick={() => doApplyClub(club.id)}
+                >
                   Apply to Join
                 </Button>
               </div>
@@ -2426,7 +3085,9 @@ function ClubDetailPage() {
           </div>
 
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-            <p className="text-xs font-mono text-muted-foreground">Contact</p>
+            <p className="text-xs font-mono text-muted-foreground">
+              Contact
+            </p>
             <div className="text-sm">{club.contact_email}</div>
             {adminUser && (
               <div className="flex items-center gap-2 pt-1 border-t border-border">
@@ -2436,8 +3097,12 @@ function ClubDetailPage() {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-xs font-medium">{adminUser.name}</p>
-                  <p className="text-[10px] text-muted-foreground font-mono">Club Admin</p>
+                  <p className="text-xs font-medium">
+                    {adminUser.name}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-mono">
+                    Club Admin
+                  </p>
                 </div>
               </div>
             )}
@@ -2462,13 +3127,20 @@ function ProfilePage() {
 
   useEffect(() => {
     if (currentUser) {
-      setForm({ name: currentUser.name, department: currentUser.department, bio: currentUser.bio ?? "" });
+      setForm({
+        name: currentUser.name,
+        department: currentUser.department,
+        bio: currentUser.bio ?? "",
+      });
     }
   }, [currentUser]);
 
-  const myRegs = store.registrations.filter((r) => r.user_id === currentUser?.id);
+  const myRegs = store.registrations.filter(
+    (r) => r.user_id === currentUser?.id,
+  );
   const myMems = store.memberships.filter(
-    (m) => m.user_id === currentUser?.id && m.status === "approved"
+    (m) =>
+      m.user_id === currentUser?.id && m.status === "approved",
   );
 
   if (!currentUser) return null;
@@ -2476,8 +3148,13 @@ function ProfilePage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">Account</p>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold">
+        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+          Account
+        </p>
+        <h1
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+          className="text-3xl font-semibold"
+        >
           My Profile
         </h1>
       </div>
@@ -2493,19 +3170,31 @@ function ProfilePage() {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <CardTitle style={{ fontFamily: "'Outfit', sans-serif" }}>
+                  <CardTitle
+                    style={{
+                      fontFamily: "'Outfit', sans-serif",
+                    }}
+                  >
                     {currentUser.name}
                   </CardTitle>
                   <CardDescription className="font-mono text-xs mt-0.5">
                     {currentUser.email}
                   </CardDescription>
-                  <Badge className={`mt-2 text-xs font-mono ${roleBadge(currentUser.role)}`} variant="outline">
+                  <Badge
+                    className={`mt-2 text-xs font-mono ${roleBadge(currentUser.role)}`}
+                    variant="outline"
+                  >
                     {currentUser.role.replace("_", " ")}
                   </Badge>
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setEditing(!editing)}>
-                <Edit3 className="size-3.5 mr-1.5" /> {editing ? "Cancel" : "Edit"}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditing(!editing)}
+              >
+                <Edit3 className="size-3.5 mr-1.5" />{" "}
+                {editing ? "Cancel" : "Edit"}
               </Button>
             </div>
           </CardHeader>
@@ -2514,17 +3203,38 @@ function ProfilePage() {
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label>Full Name</Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  <Input
+                    value={form.name}
+                    onChange={(e) =>
+                      setForm({ ...form, name: e.target.value })
+                    }
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Department</Label>
-                  <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
+                  <Select
+                    value={form.department}
+                    onValueChange={(v) =>
+                      setForm({ ...form, department: v })
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["CSE", "EEE", "BBA", "MBA", "ECO", "PHY", "ENG", "SOC"].map((d) => (
-                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      {[
+                        "CSE",
+                        "EEE",
+                        "BBA",
+                        "MBA",
+                        "ECO",
+                        "PHY",
+                        "ENG",
+                        "SOC",
+                      ].map((d) => (
+                        <SelectItem key={d} value={d}>
+                          {d}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -2533,7 +3243,9 @@ function ProfilePage() {
                   <Label>Bio</Label>
                   <Textarea
                     value={form.bio}
-                    onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, bio: e.target.value })
+                    }
                     rows={3}
                     placeholder="Tell us about yourself..."
                     className="resize-none"
@@ -2541,7 +3253,10 @@ function ProfilePage() {
                 </div>
                 <Button
                   className="bg-primary hover:bg-primary/90"
-                  onClick={() => { doUpdateProfile(form); setEditing(false); }}
+                  onClick={() => {
+                    doUpdateProfile(form);
+                    setEditing(false);
+                  }}
                 >
                   Save Changes
                 </Button>
@@ -2550,18 +3265,30 @@ function ProfilePage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs font-mono text-muted-foreground">Student ID</p>
-                    <p className="text-sm font-medium mt-0.5">{currentUser.student_id}</p>
+                    <p className="text-xs font-mono text-muted-foreground">
+                      Student ID
+                    </p>
+                    <p className="text-sm font-medium mt-0.5">
+                      {currentUser.student_id}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs font-mono text-muted-foreground">Department</p>
-                    <p className="text-sm font-medium mt-0.5">{currentUser.department}</p>
+                    <p className="text-xs font-mono text-muted-foreground">
+                      Department
+                    </p>
+                    <p className="text-sm font-medium mt-0.5">
+                      {currentUser.department}
+                    </p>
                   </div>
                 </div>
                 {currentUser.bio && (
                   <div>
-                    <p className="text-xs font-mono text-muted-foreground">Bio</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">{currentUser.bio}</p>
+                    <p className="text-xs font-mono text-muted-foreground">
+                      Bio
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {currentUser.bio}
+                    </p>
                   </div>
                 )}
               </div>
@@ -2570,19 +3297,41 @@ function ProfilePage() {
         </Card>
 
         <div className="space-y-3">
-          <StatCard icon={Ticket} label="Events" value={myRegs.length} sub="registered total" />
-          <StatCard icon={Users} label="Clubs" value={myMems.length} sub="active memberships" color="green" />
+          <StatCard
+            icon={Ticket}
+            label="Events"
+            value={myRegs.length}
+            sub="registered total"
+          />
+          <StatCard
+            icon={Users}
+            label="Clubs"
+            value={myMems.length}
+            sub="active memberships"
+            color="green"
+          />
           <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs font-mono text-muted-foreground mb-2">My Clubs</p>
+            <p className="text-xs font-mono text-muted-foreground mb-2">
+              My Clubs
+            </p>
             <div className="space-y-2">
               {myMems.slice(0, 3).map((m) => {
-                const club = store.clubs.find((c) => c.id === m.club_id);
+                const club = store.clubs.find(
+                  (c) => c.id === m.club_id,
+                );
                 return club ? (
-                  <div key={m.id} className="text-xs font-medium truncate">{club.short_name}</div>
+                  <div
+                    key={m.id}
+                    className="text-xs font-medium truncate"
+                  >
+                    {club.short_name}
+                  </div>
                 ) : null;
               })}
               {myMems.length === 0 && (
-                <p className="text-xs text-muted-foreground">No memberships yet</p>
+                <p className="text-xs text-muted-foreground">
+                  No memberships yet
+                </p>
               )}
             </div>
           </div>
@@ -2605,28 +3354,51 @@ function NotificationsPage() {
   const unread = notifs.filter((n) => !n.is_read).length;
 
   const typeInfo = (type: Notification["type"]) => {
-    const map: Record<string, { icon: React.ElementType; color: string }> = {
-      registration: { icon: CheckCircle2, color: "text-quaternary" },
+    const map: Record<
+      string,
+      { icon: React.ElementType; color: string }
+    > = {
+      registration: {
+        icon: CheckCircle2,
+        color: "text-quaternary",
+      },
       waitlist: { icon: Hourglass, color: "text-accent" },
-      event_update: { icon: AlertCircle, color: "text-secondary" },
+      event_update: {
+        icon: AlertCircle,
+        color: "text-secondary",
+      },
       membership: { icon: UserCheck, color: "text-primary" },
       role_request: { icon: BadgeCheck, color: "text-primary" },
       general: { icon: Bell, color: "text-muted-foreground" },
     };
-    return map[type] ?? { icon: Bell, color: "text-muted-foreground" };
+    return (
+      map[type] ?? {
+        icon: Bell,
+        color: "text-muted-foreground",
+      }
+    );
   };
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">Inbox</p>
-          <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold">
+          <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+            Inbox
+          </p>
+          <h1
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-3xl font-semibold"
+          >
             Notifications
           </h1>
         </div>
         {unread > 0 && (
-          <Button variant="outline" size="sm" onClick={doMarkNotificationsRead}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={doMarkNotificationsRead}
+          >
             Mark all read
           </Button>
         )}
@@ -2646,21 +3418,34 @@ function NotificationsPage() {
               <div
                 key={n.id}
                 className={`flex items-start gap-4 p-4 rounded-lg border transition-colors ${
-                  !n.is_read ? "bg-secondary/40 border-primary/20" : "bg-card border-border"
+                  !n.is_read
+                    ? "bg-secondary/40 border-primary/20"
+                    : "bg-card border-border"
                 }`}
               >
-                <div className={`rounded-full p-2 shrink-0 ${!n.is_read ? "bg-primary/8" : "bg-muted"}`}>
-                  <Icon className={`size-4 ${!n.is_read ? color : "text-muted-foreground"}`} />
+                <div
+                  className={`rounded-full p-2 shrink-0 ${!n.is_read ? "bg-primary/8" : "bg-muted"}`}
+                >
+                  <Icon
+                    className={`size-4 ${!n.is_read ? color : "text-muted-foreground"}`}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm leading-relaxed ${!n.is_read ? "font-medium" : ""}`}>
+                  <p
+                    className={`text-sm leading-relaxed ${!n.is_read ? "font-medium" : ""}`}
+                  >
                     {n.message}
                   </p>
                   <p className="text-xs text-muted-foreground font-mono mt-1">
-                    {format(parseISO(n.created_at), "d MMM yyyy · HH:mm")}
+                    {format(
+                      parseISO(n.created_at),
+                      "d MMM yyyy · HH:mm",
+                    )}
                   </p>
                 </div>
-                {!n.is_read && <span className="size-2 rounded-full bg-accent shrink-0 mt-2" />}
+                {!n.is_read && (
+                  <span className="size-2 rounded-full bg-accent shrink-0 mt-2" />
+                )}
               </div>
             );
           })}
@@ -2677,30 +3462,47 @@ function AdminDashboardPage() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
-  const myClub = store.clubs.find((c) => c.admin_user_id === currentUser?.id);
-  if (!myClub) return <EmptyState icon={AlertCircle} title="No club found" description="" />;
+  const myClub = store.clubs.find(
+    (c) => c.admin_user_id === currentUser?.id,
+  );
+  if (!myClub)
+    return (
+      <EmptyState
+        icon={AlertCircle}
+        title="No club found"
+        description=""
+      />
+    );
 
-  const myEvents = store.events.filter((e) => e.club_id === myClub.id);
-  const upcoming = myEvents.filter((e) => e.status === "published" && !isPast(parseISO(e.date)));
+  const myEvents = store.events.filter(
+    (e) => e.club_id === myClub.id,
+  );
+  const upcoming = myEvents.filter(
+    (e) =>
+      e.status === "published" && !isPast(parseISO(e.date)),
+  );
   const totalRegistrations = store.registrations.filter((r) =>
-    myEvents.some((e) => e.id === r.event_id)
+    myEvents.some((e) => e.id === r.event_id),
   ).length;
   const pendingReqs = store.memberships.filter(
-    (m) => m.club_id === myClub.id && m.status === "pending"
+    (m) => m.club_id === myClub.id && m.status === "pending",
   ).length;
   const approvedMems = store.memberships.filter(
-    (m) => m.club_id === myClub.id && m.status === "approved"
+    (m) => m.club_id === myClub.id && m.status === "approved",
   ).length;
 
   // Attendance analytics: registrations vs check-ins across this club's events.
   const chartData = myEvents
     .map((e) => {
       const regs = store.registrations.filter(
-        (r) => r.event_id === e.id && r.status === "registered"
+        (r) => r.event_id === e.id && r.status === "registered",
       );
       return {
         id: e.id,
-        name: e.title.length > 18 ? `${e.title.slice(0, 18)}…` : e.title,
+        name:
+          e.title.length > 18
+            ? `${e.title.slice(0, 18)}…`
+            : e.title,
         registrations: e.registered_count,
         checkedIn: regs.filter((r) => r.checked_in).length,
       };
@@ -2708,44 +3510,85 @@ function AdminDashboardPage() {
     .sort((a, b) => b.registrations - a.registrations)
     .slice(0, 6);
   const totalCheckedIn = store.registrations.filter(
-    (r) => myEvents.some((e) => e.id === r.event_id) && r.checked_in
+    (r) =>
+      myEvents.some((e) => e.id === r.event_id) && r.checked_in,
   ).length;
   const attendanceRate =
-    totalRegistrations > 0 ? Math.round((totalCheckedIn / totalRegistrations) * 100) : 0;
+    totalRegistrations > 0
+      ? Math.round((totalCheckedIn / totalRegistrations) * 100)
+      : 0;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <div>
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">Club Admin</p>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold">
+        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+          Club Admin
+        </p>
+        <h1
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+          className="text-3xl font-semibold"
+        >
           {myClub.name}
         </h1>
-        <p className="text-sm text-muted-foreground mt-1 font-mono">{myClub.short_name} · {myClub.category}</p>
+        <p className="text-sm text-muted-foreground mt-1 font-mono">
+          {myClub.short_name} · {myClub.category}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Users} label="Total Members" value={approvedMems} />
-        <StatCard icon={CalendarDays} label="Upcoming Events" value={upcoming.length} color="accent" />
-        <StatCard icon={Ticket} label="Registrations" value={totalRegistrations} color="green" />
-        <StatCard icon={UserCheck} label="Pending Requests" value={pendingReqs} color="purple" />
+        <StatCard
+          icon={Users}
+          label="Total Members"
+          value={approvedMems}
+        />
+        <StatCard
+          icon={CalendarDays}
+          label="Upcoming Events"
+          value={upcoming.length}
+          color="accent"
+        />
+        <StatCard
+          icon={Ticket}
+          label="Registrations"
+          value={totalRegistrations}
+          color="green"
+        />
+        <StatCard
+          icon={UserCheck}
+          label="Pending Requests"
+          value={pendingReqs}
+          color="purple"
+        />
       </div>
 
       <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-semibold">
+          <h2
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-lg font-semibold"
+          >
             Event Engagement
           </h2>
           <div className="text-right">
-            <p className="text-2xl font-mono font-bold text-quaternary">{attendanceRate}%</p>
+            <p className="text-2xl font-mono font-bold text-quaternary">
+              {attendanceRate}%
+            </p>
             <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest">
               attendance rate
             </p>
           </div>
         </div>
         {chartData.length === 0 ? (
-          <EmptyState icon={CalendarDays} title="No events yet" description="Create an event to see engagement analytics." />
+          <EmptyState
+            icon={CalendarDays}
+            title="No events yet"
+            description="Create an event to see engagement analytics."
+          />
         ) : (
-          <ResponsiveContainer width="100%" height={Math.max(160, chartData.length * 46)}>
+          <ResponsiveContainer
+            width="100%"
+            height={Math.max(160, chartData.length * 46)}
+          >
             <BarChart
               data={chartData}
               layout="vertical"
@@ -2771,24 +3614,42 @@ function AdminDashboardPage() {
                 }}
                 formatter={(value: number, name: string) => [
                   value,
-                  name === "registrations" ? "Registered" : "Checked in",
+                  name === "registrations"
+                    ? "Registered"
+                    : "Checked in",
                 ]}
               />
-              <Bar dataKey="registrations" radius={[0, 6, 6, 0]} fill="var(--primary)">
+              <Bar
+                dataKey="registrations"
+                radius={[0, 6, 6, 0]}
+                fill="var(--primary)"
+              >
                 {chartData.map((d) => (
                   <Cell key={d.id} fill="var(--primary)" />
                 ))}
               </Bar>
-              <Bar dataKey="checkedIn" radius={[0, 6, 6, 0]} fill="var(--quaternary)" />
+              <Bar
+                dataKey="checkedIn"
+                radius={[0, 6, 6, 0]}
+                fill="var(--quaternary)"
+              />
             </BarChart>
           </ResponsiveContainer>
         )}
         <div className="flex items-center gap-4 mt-3 text-xs font-mono text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm" style={{ background: "var(--primary)" }} /> Registered
+            <span
+              className="size-2.5 rounded-sm"
+              style={{ background: "var(--primary)" }}
+            />{" "}
+            Registered
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm" style={{ background: "var(--quaternary)" }} /> Checked in
+            <span
+              className="size-2.5 rounded-sm"
+              style={{ background: "var(--quaternary)" }}
+            />{" "}
+            Checked in
           </span>
         </div>
       </div>
@@ -2807,7 +3668,10 @@ function AdminDashboardPage() {
           onClick={() => navigate("/admin/requests")}
         >
           <UserCheck className="size-5" />
-          <span>Review Requests {pendingReqs > 0 && `(${pendingReqs})`}</span>
+          <span>
+            Review Requests{" "}
+            {pendingReqs > 0 && `(${pendingReqs})`}
+          </span>
         </Button>
         <Button
           variant="outline"
@@ -2821,11 +3685,20 @@ function AdminDashboardPage() {
 
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-semibold">
+          <h2
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-lg font-semibold"
+          >
             Upcoming Events
           </h2>
-          <Button variant="ghost" size="sm" className="text-primary text-xs" onClick={() => navigate("/admin/events")}>
-            Manage all <ChevronRight className="size-3.5 ml-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-primary text-xs"
+            onClick={() => navigate("/admin/events")}
+          >
+            Manage all{" "}
+            <ChevronRight className="size-3.5 ml-1" />
           </Button>
         </div>
         {upcoming.length === 0 ? (
@@ -2833,30 +3706,48 @@ function AdminDashboardPage() {
             icon={CalendarDays}
             title="No upcoming events"
             description="Create your first event to get started."
-            action={<Button size="sm" onClick={() => navigate("/admin/events/new")}>Create Event</Button>}
+            action={
+              <Button
+                size="sm"
+                onClick={() => navigate("/admin/events/new")}
+              >
+                Create Event
+              </Button>
+            }
           />
         ) : (
           <div className="space-y-3">
             {upcoming.slice(0, 5).map((e) => {
               const regs = store.registrations.filter(
-                (r) => r.event_id === e.id && r.status === "registered"
+                (r) =>
+                  r.event_id === e.id &&
+                  r.status === "registered",
               ).length;
               return (
                 <div
                   key={e.id}
                   className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg hover:border-primary/30 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/admin/events/${e.id}/roster`)}
+                  onClick={() =>
+                    navigate(`/admin/events/${e.id}/roster`)
+                  }
                 >
                   <CalendarDays className="size-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{e.title}</p>
+                    <p className="text-sm font-medium truncate">
+                      {e.title}
+                    </p>
                     <p className="text-xs text-muted-foreground font-mono">
-                      {format(parseISO(e.date), "d MMM")} · {e.start_time}
+                      {format(parseISO(e.date), "d MMM")} ·{" "}
+                      {e.start_time}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-mono font-semibold">{regs}/{e.capacity}</p>
-                    <p className="text-[10px] text-muted-foreground font-mono">registrations</p>
+                    <p className="text-sm font-mono font-semibold">
+                      {regs}/{e.capacity}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground font-mono">
+                      registrations
+                    </p>
                   </div>
                 </div>
               );
@@ -2875,7 +3766,9 @@ function EventManagePage() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
-  const myClub = store.clubs.find((c) => c.admin_user_id === currentUser?.id);
+  const myClub = store.clubs.find(
+    (c) => c.admin_user_id === currentUser?.id,
+  );
   const myEvents = store.events
     .filter((e) => e.club_id === myClub?.id)
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -2884,12 +3777,20 @@ function EventManagePage() {
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">Club Admin</p>
-          <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold">
+          <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+            Club Admin
+          </p>
+          <h1
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-3xl font-semibold"
+          >
             Manage Events
           </h1>
         </div>
-        <Button className="bg-primary hover:bg-primary/90" onClick={() => navigate("/admin/events/new")}>
+        <Button
+          className="bg-primary hover:bg-primary/90"
+          onClick={() => navigate("/admin/events/new")}
+        >
           <Plus className="size-4 mr-1.5" /> New Event
         </Button>
       </div>
@@ -2899,44 +3800,66 @@ function EventManagePage() {
           icon={CalendarDays}
           title="No events yet"
           description="Create your first event."
-          action={<Button size="sm" onClick={() => navigate("/admin/events/new")}>Create Event</Button>}
+          action={
+            <Button
+              size="sm"
+              onClick={() => navigate("/admin/events/new")}
+            >
+              Create Event
+            </Button>
+          }
         />
       ) : (
         <div className="space-y-3">
           {myEvents.map((e) => {
             const regs = store.registrations.filter(
-              (r) => r.event_id === e.id && r.status === "registered"
+              (r) =>
+                r.event_id === e.id &&
+                r.status === "registered",
             ).length;
             const waitlisted = store.registrations.filter(
-              (r) => r.event_id === e.id && r.status === "waitlisted"
+              (r) =>
+                r.event_id === e.id &&
+                r.status === "waitlisted",
             ).length;
             return (
-              <div key={e.id} className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg">
+              <div
+                key={e.id}
+                className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg"
+              >
                 <div className="w-14 h-14 rounded-md overflow-hidden bg-muted shrink-0">
-                  <ImageWithFallback src={e.poster_url} alt={e.title} className="w-full h-full object-cover" />
+                  <ImageWithFallback
+                    src={e.poster_url}
+                    alt={e.title}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-semibold truncate">{e.title}</p>
+                    <p className="text-sm font-semibold truncate">
+                      {e.title}
+                    </p>
                     <Badge
                       variant="outline"
                       className={`text-[10px] font-mono shrink-0 ${
                         e.status === "published"
                           ? "text-quaternary border-quaternary/40"
                           : e.status === "cancelled"
-                          ? "text-destructive border-destructive/30"
-                          : "text-muted-foreground"
+                            ? "text-destructive border-destructive/30"
+                            : "text-muted-foreground"
                       }`}
                     >
                       {e.status}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground font-mono">
-                    {format(parseISO(e.date), "d MMM yyyy")} · {e.start_time}
+                    {format(parseISO(e.date), "d MMM yyyy")} ·{" "}
+                    {e.start_time}
                   </p>
                   <p className="text-xs text-muted-foreground font-mono mt-0.5">
                     {regs}/{e.capacity} registered
-                    {waitlisted > 0 && ` · ${waitlisted} waitlisted`}
+                    {waitlisted > 0 &&
+                      ` · ${waitlisted} waitlisted`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -2944,7 +3867,9 @@ function EventManagePage() {
                     variant="ghost"
                     size="icon"
                     className="size-8"
-                    onClick={() => navigate(`/admin/events/${e.id}/roster`)}
+                    onClick={() =>
+                      navigate(`/admin/events/${e.id}/roster`)
+                    }
                     title="View roster"
                   >
                     <List className="size-3.5" />
@@ -2953,7 +3878,9 @@ function EventManagePage() {
                     variant="ghost"
                     size="icon"
                     className="size-8"
-                    onClick={() => navigate(`/admin/events/edit/${e.id}`)}
+                    onClick={() =>
+                      navigate(`/admin/events/edit/${e.id}`)
+                    }
                     title="Edit event"
                   >
                     <Edit3 className="size-3.5" />
@@ -2961,20 +3888,33 @@ function EventManagePage() {
                   {e.status === "published" && (
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-8 text-accent" title="Cancel event">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 text-accent"
+                          title="Cancel event"
+                        >
                           <XCircle className="size-3.5" />
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Cancel event?</DialogTitle>
+                          <DialogTitle>
+                            Cancel event?
+                          </DialogTitle>
                           <DialogDescription>
-                            All {regs} registered attendees will be notified.
+                            All {regs} registered attendees will
+                            be notified.
                           </DialogDescription>
                         </DialogHeader>
                         <DialogFooter>
-                          <Button variant="outline">Keep event</Button>
-                          <Button variant="destructive" onClick={() => doCancelEvent(e.id)}>
+                          <Button variant="outline">
+                            Keep event
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            onClick={() => doCancelEvent(e.id)}
+                          >
                             Cancel event
                           </Button>
                         </DialogFooter>
@@ -2983,7 +3923,12 @@ function EventManagePage() {
                   )}
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="size-8 text-destructive" title="Delete event">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-destructive"
+                        title="Delete event"
+                      >
                         <Trash2 className="size-3.5" />
                       </Button>
                     </DialogTrigger>
@@ -2991,12 +3936,16 @@ function EventManagePage() {
                       <DialogHeader>
                         <DialogTitle>Delete event?</DialogTitle>
                         <DialogDescription>
-                          This action is irreversible. All registrations will be removed.
+                          This action is irreversible. All
+                          registrations will be removed.
                         </DialogDescription>
                       </DialogHeader>
                       <DialogFooter>
                         <Button variant="outline">Keep</Button>
-                        <Button variant="destructive" onClick={() => doDeleteEvent(e.id)}>
+                        <Button
+                          variant="destructive"
+                          onClick={() => doDeleteEvent(e.id)}
+                        >
                           Delete
                         </Button>
                       </DialogFooter>
@@ -3022,7 +3971,9 @@ function EventFormPage() {
 
   const isEdit = !!id;
   const existingEvent = store.events.find((e) => e.id === id);
-  const myClub = store.clubs.find((c) => c.admin_user_id === currentUser?.id);
+  const myClub = store.clubs.find(
+    (c) => c.admin_user_id === currentUser?.id,
+  );
 
   const [form, setForm] = useState({
     title: existingEvent?.title ?? "",
@@ -3034,23 +3985,26 @@ function EventFormPage() {
     capacity: existingEvent?.capacity ?? 50,
     poster_url: existingEvent?.poster_url ?? "",
     tags: (existingEvent?.tags ?? []).join(", "),
-    status: (existingEvent?.status ?? "published") as "draft" | "published",
+    status: (existingEvent?.status ?? "published") as
+      "draft" | "published",
     recurrence: (existingEvent?.recurrence ?? "none") as
-      | "none"
-      | "daily"
-      | "weekly"
-      | "monthly",
+      "none" | "daily" | "weekly" | "monthly",
     recurrence_count: existingEvent?.recurrence_count ?? 4,
   });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!myClub) return;
-    const tags = form.tags.split(",").map((t) => t.trim()).filter(Boolean);
+    const tags = form.tags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
     const recurrenceFields = {
       recurrence: form.recurrence,
       recurrence_count:
-        form.recurrence === "none" ? 1 : Math.max(1, Number(form.recurrence_count)),
+        form.recurrence === "none"
+          ? 1
+          : Math.max(1, Number(form.recurrence_count)),
     };
 
     if (isEdit && existingEvent) {
@@ -3096,7 +4050,10 @@ function EventFormPage() {
       >
         <ArrowLeft className="size-4" /> Back
       </button>
-      <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-semibold mb-6">
+      <h1
+        style={{ fontFamily: "'Outfit', sans-serif" }}
+        className="text-2xl font-semibold mb-6"
+      >
         {isEdit ? "Edit Event" : "Create New Event"}
       </h1>
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -3104,7 +4061,9 @@ function EventFormPage() {
           <Label>Event Title *</Label>
           <Input
             value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, title: e.target.value })
+            }
             placeholder="e.g. IUB Hackathon 2026"
             required
           />
@@ -3113,7 +4072,9 @@ function EventFormPage() {
           <Label>Description *</Label>
           <Textarea
             value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, description: e.target.value })
+            }
             rows={4}
             placeholder="Describe the event..."
             className="resize-none"
@@ -3126,7 +4087,9 @@ function EventFormPage() {
             <Input
               type="date"
               value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, date: e.target.value })
+              }
               required
             />
           </div>
@@ -3135,7 +4098,9 @@ function EventFormPage() {
             <Input
               type="time"
               value={form.start_time}
-              onChange={(e) => setForm({ ...form, start_time: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, start_time: e.target.value })
+              }
               required
             />
           </div>
@@ -3144,7 +4109,9 @@ function EventFormPage() {
             <Input
               type="time"
               value={form.end_time}
-              onChange={(e) => setForm({ ...form, end_time: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, end_time: e.target.value })
+              }
               required
             />
           </div>
@@ -3153,7 +4120,9 @@ function EventFormPage() {
           <Label>Venue *</Label>
           <Input
             value={form.venue}
-            onChange={(e) => setForm({ ...form, venue: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, venue: e.target.value })
+            }
             placeholder="e.g. Main Auditorium, Block A"
             required
           />
@@ -3165,7 +4134,12 @@ function EventFormPage() {
               type="number"
               min={1}
               value={form.capacity}
-              onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  capacity: Number(e.target.value),
+                })
+              }
               required
             />
           </div>
@@ -3173,13 +4147,20 @@ function EventFormPage() {
             <Label>Status</Label>
             <Select
               value={form.status}
-              onValueChange={(v) => setForm({ ...form, status: v as "draft" | "published" })}
+              onValueChange={(v) =>
+                setForm({
+                  ...form,
+                  status: v as "draft" | "published",
+                })
+              }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="published">Published</SelectItem>
+                <SelectItem value="published">
+                  Published
+                </SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
               </SelectContent>
             </Select>
@@ -3191,14 +4172,19 @@ function EventFormPage() {
             <Select
               value={form.recurrence}
               onValueChange={(v) =>
-                setForm({ ...form, recurrence: v as typeof form.recurrence })
+                setForm({
+                  ...form,
+                  recurrence: v as typeof form.recurrence,
+                })
               }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Does not repeat</SelectItem>
+                <SelectItem value="none">
+                  Does not repeat
+                </SelectItem>
                 <SelectItem value="daily">Daily</SelectItem>
                 <SelectItem value="weekly">Weekly</SelectItem>
                 <SelectItem value="monthly">Monthly</SelectItem>
@@ -3214,7 +4200,10 @@ function EventFormPage() {
                 max={52}
                 value={form.recurrence_count}
                 onChange={(e) =>
-                  setForm({ ...form, recurrence_count: Number(e.target.value) })
+                  setForm({
+                    ...form,
+                    recurrence_count: Number(e.target.value),
+                  })
                 }
               />
             </div>
@@ -3222,15 +4211,20 @@ function EventFormPage() {
         </div>
         {form.recurrence !== "none" && (
           <p className="text-xs text-muted-foreground -mt-2">
-            Creates a series of {Math.max(1, Number(form.recurrence_count))} {form.recurrence} sessions
-            starting from the date above. You can cancel individual sessions later from the event page.
+            Creates a series of{" "}
+            {Math.max(1, Number(form.recurrence_count))}{" "}
+            {form.recurrence} sessions starting from the date
+            above. You can cancel individual sessions later from
+            the event page.
           </p>
         )}
         <div className="space-y-1.5">
           <Label>Poster Image URL</Label>
           <Input
             value={form.poster_url}
-            onChange={(e) => setForm({ ...form, poster_url: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, poster_url: e.target.value })
+            }
             placeholder="https://images.unsplash.com/..."
           />
         </div>
@@ -3238,16 +4232,27 @@ function EventFormPage() {
           <Label>Tags</Label>
           <Input
             value={form.tags}
-            onChange={(e) => setForm({ ...form, tags: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, tags: e.target.value })
+            }
             placeholder="e.g. Tech, Workshop, Competition"
           />
-          <p className="text-xs text-muted-foreground">Comma-separated list of tags</p>
+          <p className="text-xs text-muted-foreground">
+            Comma-separated list of tags
+          </p>
         </div>
         <div className="flex gap-3 pt-2">
-          <Button type="submit" className="bg-primary hover:bg-primary/90">
+          <Button
+            type="submit"
+            className="bg-primary hover:bg-primary/90"
+          >
             {isEdit ? "Save Changes" : "Create Event"}
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate(-1)}
+          >
             Cancel
           </Button>
         </div>
@@ -3259,12 +4264,36 @@ function EventFormPage() {
 // ─── Attendee Roster ──────────────────────────────────────────────────────────
 
 const FAKE_NAMES = [
-  "Sadia Islam", "Rafiq Hossain", "Mehrin Akter", "Arif Khan", "Tasnuva Begum",
-  "Nabil Ahmed", "Samiha Chowdhury", "Imran Ali", "Lamia Rahman", "Sakib Hassan",
-  "Puja Roy", "Zahid Hasan", "Ayesha Siddiqua", "Rony Das", "Farhan Kabir",
-  "Nadia Sultana", "Tashfin Ahmed", "Minhaj Uddin", "Rabeya Khatun", "Asif Iqbal",
-  "Sharmin Akter", "Jubayer Islam", "Maliha Hoque", "Rifat Hossain", "Sumona Begum",
-  "Masud Rana", "Dilruba Khanam", "Tanveer Ahmed", "Shamima Nasrin", "Rashed Khan",
+  "Sadia Islam",
+  "Rafiq Hossain",
+  "Mehrin Akter",
+  "Arif Khan",
+  "Tasnuva Begum",
+  "Nabil Ahmed",
+  "Samiha Chowdhury",
+  "Imran Ali",
+  "Lamia Rahman",
+  "Sakib Hassan",
+  "Puja Roy",
+  "Zahid Hasan",
+  "Ayesha Siddiqua",
+  "Rony Das",
+  "Farhan Kabir",
+  "Nadia Sultana",
+  "Tashfin Ahmed",
+  "Minhaj Uddin",
+  "Rabeya Khatun",
+  "Asif Iqbal",
+  "Sharmin Akter",
+  "Jubayer Islam",
+  "Maliha Hoque",
+  "Rifat Hossain",
+  "Sumona Begum",
+  "Masud Rana",
+  "Dilruba Khanam",
+  "Tanveer Ahmed",
+  "Shamima Nasrin",
+  "Rashed Khan",
 ];
 
 function AttendeeRosterPage() {
@@ -3275,31 +4304,54 @@ function AttendeeRosterPage() {
   const [scanCode, setScanCode] = useState("");
 
   const event = store.events.find((e) => e.id === id);
-  const realRegs = store.registrations.filter((r) => r.event_id === id);
-  const realRegistered = realRegs.filter((r) => r.status === "registered");
-  const realWaitlisted = realRegs.filter((r) => r.status === "waitlisted");
-  const checkedInCount = realRegistered.filter((r) => r.checked_in).length;
+  const realRegs = store.registrations.filter(
+    (r) => r.event_id === id,
+  );
+  const realRegistered = realRegs.filter(
+    (r) => r.status === "registered",
+  );
+  const realWaitlisted = realRegs.filter(
+    (r) => r.status === "waitlisted",
+  );
+  const checkedInCount = realRegistered.filter(
+    (r) => r.checked_in,
+  ).length;
 
-  const fakePadding = Math.max(0, (event?.registered_count ?? 0) - realRegistered.length);
+  const fakePadding = Math.max(
+    0,
+    (event?.registered_count ?? 0) - realRegistered.length,
+  );
   const fakeAttendees = FAKE_NAMES.slice(0, fakePadding);
 
   const handleScan = () => {
     const parsed = parseCheckInCode(scanCode);
     if (!parsed || parsed.eventId !== id) {
-      toast.error("Invalid code", { description: "That QR code isn't for this event." });
+      toast.error("Invalid code", {
+        description: "That QR code isn't for this event.",
+      });
       return;
     }
-    const reg = realRegistered.find((r) => r.id === parsed.registrationId);
+    const reg = realRegistered.find(
+      (r) => r.id === parsed.registrationId,
+    );
     if (!reg) {
-      toast.error("Not found", { description: "No matching registration for this event." });
+      toast.error("Not found", {
+        description: "No matching registration for this event.",
+      });
       return;
     }
-    const attendee = store.users.find((u) => u.id === reg.user_id);
+    const attendee = store.users.find(
+      (u) => u.id === reg.user_id,
+    );
     if (reg.checked_in) {
-      toast.info("Already checked in", { description: `${attendee?.name} is already checked in.` });
+      toast.info("Already checked in", {
+        description: `${attendee?.name} is already checked in.`,
+      });
     } else {
       doCheckIn(reg.id, true);
-      toast.success("Checked in", { description: `${attendee?.name} is now checked in.` });
+      toast.success("Checked in", {
+        description: `${attendee?.name} is now checked in.`,
+      });
     }
     setScanCode("");
     setScanOpen(false);
@@ -3308,7 +4360,11 @@ function AttendeeRosterPage() {
   if (!event) {
     return (
       <div className="p-6">
-        <EmptyState icon={AlertCircle} title="Event not found" description="" />
+        <EmptyState
+          icon={AlertCircle}
+          title="Event not found"
+          description=""
+        />
       </div>
     );
   }
@@ -3324,44 +4380,64 @@ function AttendeeRosterPage() {
 
       <div className="flex items-start justify-between mb-6">
         <div>
-          <p className="text-xs font-mono text-muted-foreground mb-1">Attendee Roster</p>
-          <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-semibold">
+          <p className="text-xs font-mono text-muted-foreground mb-1">
+            Attendee Roster
+          </p>
+          <h1
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-2xl font-semibold"
+          >
             {event.title}
           </h1>
           <p className="text-sm text-muted-foreground font-mono mt-1">
-            {format(parseISO(event.date), "d MMM yyyy")} · {event.start_time}
+            {format(parseISO(event.date), "d MMM yyyy")} ·{" "}
+            {event.start_time}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-mono font-bold">{event.registered_count}/{event.capacity}</p>
-          <p className="text-xs text-muted-foreground font-mono">registered</p>
+          <p className="text-2xl font-mono font-bold">
+            {event.registered_count}/{event.capacity}
+          </p>
+          <p className="text-xs text-muted-foreground font-mono">
+            registered
+          </p>
           <p className="text-xs text-quaternary font-mono mt-0.5">
             {checkedInCount} checked in
           </p>
           {event.waitlisted_count > 0 && (
-            <p className="text-xs text-accent font-mono mt-0.5">{event.waitlisted_count} waitlisted</p>
+            <p className="text-xs text-accent font-mono mt-0.5">
+              {event.waitlisted_count} waitlisted
+            </p>
           )}
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-4 mb-4">
-        <CapacityBar registered={event.registered_count} capacity={event.capacity} />
+        <CapacityBar
+          registered={event.registered_count}
+          capacity={event.capacity}
+        />
         <Dialog open={scanOpen} onOpenChange={setScanOpen}>
           <DialogTrigger asChild>
             <Button className="shrink-0 bg-primary hover:bg-primary/90">
-              <CheckCircle2 className="size-4 mr-2" /> Scan Check-in
+              <CheckCircle2 className="size-4 mr-2" /> Scan
+              Check-in
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Scan attendee QR</DialogTitle>
               <DialogDescription>
-                Scan the attendee's QR with any reader and paste the decoded code below, or
-                enter it manually to check them in.
+                Scan the attendee's QR with any reader and paste
+                the decoded code below, or enter it manually to
+                check them in.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2 py-2">
-              <Label htmlFor="scan-code" className="text-xs font-mono">
+              <Label
+                htmlFor="scan-code"
+                className="text-xs font-mono"
+              >
                 Check-in code
               </Label>
               <Input
@@ -3369,14 +4445,22 @@ function AttendeeRosterPage() {
                 value={scanCode}
                 onChange={(e) => setScanCode(e.target.value)}
                 placeholder="CHK|event_1|reg_1"
-                onKeyDown={(e) => e.key === "Enter" && handleScan()}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && handleScan()
+                }
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setScanOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setScanOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleScan} disabled={!scanCode.trim()}>
+              <Button
+                onClick={handleScan}
+                disabled={!scanCode.trim()}
+              >
                 Check in
               </Button>
             </DialogFooter>
@@ -3386,8 +4470,12 @@ function AttendeeRosterPage() {
 
       <Tabs defaultValue="registered" className="mt-6">
         <TabsList className="bg-muted">
-          <TabsTrigger value="registered">Registered ({event.registered_count})</TabsTrigger>
-          <TabsTrigger value="waitlisted">Waitlist ({event.waitlisted_count})</TabsTrigger>
+          <TabsTrigger value="registered">
+            Registered ({event.registered_count})
+          </TabsTrigger>
+          <TabsTrigger value="waitlisted">
+            Waitlist ({event.waitlisted_count})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="registered" className="mt-4">
@@ -3395,19 +4483,33 @@ function AttendeeRosterPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-mono">#</TableHead>
-                  <TableHead className="text-xs font-mono">Name</TableHead>
-                  <TableHead className="text-xs font-mono">Department</TableHead>
-                  <TableHead className="text-xs font-mono">Registered At</TableHead>
-                  <TableHead className="text-xs font-mono text-right">Check-in</TableHead>
+                  <TableHead className="text-xs font-mono">
+                    #
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Name
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Department
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Registered At
+                  </TableHead>
+                  <TableHead className="text-xs font-mono text-right">
+                    Check-in
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {realRegistered.map((r, i) => {
-                  const user = store.users.find((u) => u.id === r.user_id);
+                  const user = store.users.find(
+                    (u) => u.id === r.user_id,
+                  );
                   return (
                     <TableRow key={r.id}>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {i + 1}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar className="size-6">
@@ -3415,12 +4517,19 @@ function AttendeeRosterPage() {
                               {getInitials(user?.name ?? "?")}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-sm font-medium">{user?.name}</span>
+                          <span className="text-sm font-medium">
+                            {user?.name}
+                          </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{user?.department}</TableCell>
                       <TableCell className="text-xs font-mono text-muted-foreground">
-                        {format(parseISO(r.registered_at), "d MMM · HH:mm")}
+                        {user?.department}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {format(
+                          parseISO(r.registered_at),
+                          "d MMM · HH:mm",
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         {r.checked_in ? (
@@ -3428,16 +4537,21 @@ function AttendeeRosterPage() {
                             variant="ghost"
                             size="sm"
                             className="text-quaternary hover:text-quaternary h-7"
-                            onClick={() => doCheckIn(r.id, false)}
+                            onClick={() =>
+                              doCheckIn(r.id, false)
+                            }
                           >
-                            <BadgeCheck className="size-3.5 mr-1" /> In
+                            <BadgeCheck className="size-3.5 mr-1" />{" "}
+                            In
                           </Button>
                         ) : (
                           <Button
                             variant="outline"
                             size="sm"
                             className="h-7"
-                            onClick={() => doCheckIn(r.id, true)}
+                            onClick={() =>
+                              doCheckIn(r.id, true)
+                            }
                           >
                             Check in
                           </Button>
@@ -3458,12 +4572,20 @@ function AttendeeRosterPage() {
                             {getInitials(name)}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm font-medium">{name}</span>
+                        <span className="text-sm font-medium">
+                          {name}
+                        </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs font-mono text-muted-foreground">CSE</TableCell>
-                    <TableCell className="text-xs font-mono text-muted-foreground">—</TableCell>
-                    <TableCell className="text-right text-xs font-mono text-muted-foreground">—</TableCell>
+                    <TableCell className="text-xs font-mono text-muted-foreground">
+                      CSE
+                    </TableCell>
+                    <TableCell className="text-xs font-mono text-muted-foreground">
+                      —
+                    </TableCell>
+                    <TableCell className="text-right text-xs font-mono text-muted-foreground">
+                      —
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -3472,24 +4594,39 @@ function AttendeeRosterPage() {
         </TabsContent>
 
         <TabsContent value="waitlisted" className="mt-4">
-          {realWaitlisted.length === 0 && event.waitlisted_count === 0 ? (
-            <EmptyState icon={Hourglass} title="No one on waitlist" description="Waitlist is empty." />
+          {realWaitlisted.length === 0 &&
+          event.waitlisted_count === 0 ? (
+            <EmptyState
+              icon={Hourglass}
+              title="No one on waitlist"
+              description="Waitlist is empty."
+            />
           ) : (
             <div className="bg-card border border-border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs font-mono">Position</TableHead>
-                    <TableHead className="text-xs font-mono">Name</TableHead>
-                    <TableHead className="text-xs font-mono">Joined Waitlist</TableHead>
+                    <TableHead className="text-xs font-mono">
+                      Position
+                    </TableHead>
+                    <TableHead className="text-xs font-mono">
+                      Name
+                    </TableHead>
+                    <TableHead className="text-xs font-mono">
+                      Joined Waitlist
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {realWaitlisted.map((r, i) => {
-                    const user = store.users.find((u) => u.id === r.user_id);
+                    const user = store.users.find(
+                      (u) => u.id === r.user_id,
+                    );
                     return (
                       <TableRow key={r.id}>
-                        <TableCell className="text-xs font-mono text-accent font-semibold">#{i + 1}</TableCell>
+                        <TableCell className="text-xs font-mono text-accent font-semibold">
+                          #{i + 1}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Avatar className="size-6">
@@ -3497,11 +4634,16 @@ function AttendeeRosterPage() {
                                 {getInitials(user?.name ?? "?")}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="text-sm font-medium">{user?.name}</span>
+                            <span className="text-sm font-medium">
+                              {user?.name}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell className="text-xs font-mono text-muted-foreground">
-                          {format(parseISO(r.registered_at), "d MMM · HH:mm")}
+                          {format(
+                            parseISO(r.registered_at),
+                            "d MMM · HH:mm",
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -3522,71 +4664,110 @@ function MembershipRequestsPage() {
   const { store, doReviewMembership } = useData();
   const { currentUser } = useAuth();
 
-  const myClub = store.clubs.find((c) => c.admin_user_id === currentUser?.id);
+  const myClub = store.clubs.find(
+    (c) => c.admin_user_id === currentUser?.id,
+  );
   const pending = store.memberships
-    .filter((m) => m.club_id === myClub?.id && m.status === "pending")
-    .map((m) => ({ ...m, user: store.users.find((u) => u.id === m.user_id) }));
+    .filter(
+      (m) => m.club_id === myClub?.id && m.status === "pending",
+    )
+    .map((m) => ({
+      ...m,
+      user: store.users.find((u) => u.id === m.user_id),
+    }));
 
   const reviewed = store.memberships
-    .filter((m) => m.club_id === myClub?.id && m.status !== "pending")
+    .filter(
+      (m) => m.club_id === myClub?.id && m.status !== "pending",
+    )
     .sort((a, b) => b.applied_at.localeCompare(a.applied_at))
     .slice(0, 10)
-    .map((m) => ({ ...m, user: store.users.find((u) => u.id === m.user_id) }));
+    .map((m) => ({
+      ...m,
+      user: store.users.find((u) => u.id === m.user_id),
+    }));
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">Club Admin</p>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-semibold">
+        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+          Club Admin
+        </p>
+        <h1
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+          className="text-2xl font-semibold"
+        >
           Membership Requests
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">{myClub?.name}</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {myClub?.name}
+        </p>
       </div>
 
       <Tabs defaultValue="pending">
         <TabsList className="bg-muted">
           <TabsTrigger value="pending">
-            Pending {pending.length > 0 && `(${pending.length})`}
+            Pending{" "}
+            {pending.length > 0 && `(${pending.length})`}
           </TabsTrigger>
           <TabsTrigger value="reviewed">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending" className="mt-4">
           {pending.length === 0 ? (
-            <EmptyState icon={UserCheck} title="No pending requests" description="All requests have been reviewed." />
+            <EmptyState
+              icon={UserCheck}
+              title="No pending requests"
+              description="All requests have been reviewed."
+            />
           ) : (
             <div className="space-y-3">
               {pending.map(({ user, ...mem }) => (
-                <div key={mem.id} className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg">
+                <div
+                  key={mem.id}
+                  className="flex items-center gap-4 p-4 bg-card border border-border rounded-lg"
+                >
                   <Avatar className="size-10 shrink-0">
                     <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold">
                       {getInitials(user?.name ?? "?")}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold">{user?.name}</p>
+                    <p className="text-sm font-semibold">
+                      {user?.name}
+                    </p>
                     <p className="text-xs text-muted-foreground font-mono">
                       {user?.department} · {user?.student_id}
                     </p>
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                      Applied {format(parseISO(mem.applied_at), "d MMM yyyy")}
+                      Applied{" "}
+                      {format(
+                        parseISO(mem.applied_at),
+                        "d MMM yyyy",
+                      )}
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <Button
                       size="sm"
                       className="bg-quaternary hover:bg-quaternary/80 text-foreground"
-                      onClick={() => doReviewMembership(mem.id, "approved")}
+                      onClick={() =>
+                        doReviewMembership(mem.id, "approved")
+                      }
                     >
-                      <CheckCircle2 className="size-3.5 mr-1" /> Approve
+                      <CheckCircle2 className="size-3.5 mr-1" />{" "}
+                      Approve
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       className="text-destructive border-destructive/30 hover:bg-destructive/8"
-                      onClick={() => doReviewMembership(mem.id, "rejected")}
+                      onClick={() =>
+                        doReviewMembership(mem.id, "rejected")
+                      }
                     >
-                      <XCircle className="size-3.5 mr-1" /> Reject
+                      <XCircle className="size-3.5 mr-1" />{" "}
+                      Reject
                     </Button>
                   </div>
                 </div>
@@ -3597,16 +4778,28 @@ function MembershipRequestsPage() {
 
         <TabsContent value="reviewed" className="mt-4">
           {reviewed.length === 0 ? (
-            <EmptyState icon={Users} title="No history" description="" />
+            <EmptyState
+              icon={Users}
+              title="No history"
+              description=""
+            />
           ) : (
             <div className="bg-card border border-border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs font-mono">Name</TableHead>
-                    <TableHead className="text-xs font-mono">Department</TableHead>
-                    <TableHead className="text-xs font-mono">Status</TableHead>
-                    <TableHead className="text-xs font-mono">Date</TableHead>
+                    <TableHead className="text-xs font-mono">
+                      Name
+                    </TableHead>
+                    <TableHead className="text-xs font-mono">
+                      Department
+                    </TableHead>
+                    <TableHead className="text-xs font-mono">
+                      Status
+                    </TableHead>
+                    <TableHead className="text-xs font-mono">
+                      Date
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -3619,10 +4812,14 @@ function MembershipRequestsPage() {
                               {getInitials(user?.name ?? "?")}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-sm font-medium">{user?.name}</span>
+                          <span className="text-sm font-medium">
+                            {user?.name}
+                          </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{user?.department}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {user?.department}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
@@ -3636,7 +4833,10 @@ function MembershipRequestsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs font-mono text-muted-foreground">
-                        {format(parseISO(mem.applied_at), "d MMM yyyy")}
+                        {format(
+                          parseISO(mem.applied_at),
+                          "d MMM yyyy",
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -3656,16 +4856,29 @@ function MemberRosterPage() {
   const { store, doRemoveMember } = useData();
   const { currentUser } = useAuth();
 
-  const myClub = store.clubs.find((c) => c.admin_user_id === currentUser?.id);
+  const myClub = store.clubs.find(
+    (c) => c.admin_user_id === currentUser?.id,
+  );
   const members = store.memberships
-    .filter((m) => m.club_id === myClub?.id && m.status === "approved")
-    .map((m) => ({ ...m, user: store.users.find((u) => u.id === m.user_id) }));
+    .filter(
+      (m) =>
+        m.club_id === myClub?.id && m.status === "approved",
+    )
+    .map((m) => ({
+      ...m,
+      user: store.users.find((u) => u.id === m.user_id),
+    }));
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">Club Admin</p>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-semibold">
+        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+          Club Admin
+        </p>
+        <h1
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+          className="text-2xl font-semibold"
+        >
           Member Roster
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -3674,16 +4887,28 @@ function MemberRosterPage() {
       </div>
 
       {members.length === 0 ? (
-        <EmptyState icon={Users} title="No members yet" description="" />
+        <EmptyState
+          icon={Users}
+          title="No members yet"
+          description=""
+        />
       ) : (
         <div className="bg-card border border-border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="text-xs font-mono">Member</TableHead>
-                <TableHead className="text-xs font-mono">Department</TableHead>
-                <TableHead className="text-xs font-mono">Role</TableHead>
-                <TableHead className="text-xs font-mono">Joined</TableHead>
+                <TableHead className="text-xs font-mono">
+                  Member
+                </TableHead>
+                <TableHead className="text-xs font-mono">
+                  Department
+                </TableHead>
+                <TableHead className="text-xs font-mono">
+                  Role
+                </TableHead>
+                <TableHead className="text-xs font-mono">
+                  Joined
+                </TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -3698,38 +4923,65 @@ function MemberRosterPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="text-sm font-medium">{user?.name}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{user?.student_id}</p>
+                        <p className="text-sm font-medium">
+                          {user?.name}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground font-mono">
+                          {user?.student_id}
+                        </p>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs font-mono text-muted-foreground">{user?.department}</TableCell>
+                  <TableCell className="text-xs font-mono text-muted-foreground">
+                    {user?.department}
+                  </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-[10px] font-mono text-primary border-primary/30">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-mono text-primary border-primary/30"
+                    >
                       {mem.role ?? "Member"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs font-mono text-muted-foreground">
-                    {format(parseISO(mem.applied_at), "d MMM yyyy")}
+                    {format(
+                      parseISO(mem.applied_at),
+                      "d MMM yyyy",
+                    )}
                   </TableCell>
                   <TableCell>
                     {mem.user_id !== currentUser?.id && (
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-7 text-destructive hover:bg-destructive/8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-destructive hover:bg-destructive/8"
+                          >
                             <Trash2 className="size-3.5" />
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Remove member?</DialogTitle>
+                            <DialogTitle>
+                              Remove member?
+                            </DialogTitle>
                             <DialogDescription>
-                              {user?.name} will be removed from {myClub?.name}. They can re-apply later.
+                              {user?.name} will be removed from{" "}
+                              {myClub?.name}. They can re-apply
+                              later.
                             </DialogDescription>
                           </DialogHeader>
                           <DialogFooter>
-                            <Button variant="outline">Cancel</Button>
-                            <Button variant="destructive" onClick={() => doRemoveMember(mem.id)}>
+                            <Button variant="outline">
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              onClick={() =>
+                                doRemoveMember(mem.id)
+                              }
+                            >
                               Remove
                             </Button>
                           </DialogFooter>
@@ -3756,8 +5008,11 @@ function RequestRolePage() {
   const { store, doSubmitRoleRequest } = useData();
   const { currentUser, isStudent } = useAuth();
 
-  const [kind, setKind] = useState<"lead_existing" | "create_club">("create_club");
-  const [requestedRole, setRequestedRole] = useState("President");
+  const [kind, setKind] = useState<
+    "lead_existing" | "create_club"
+  >("create_club");
+  const [requestedRole, setRequestedRole] =
+    useState("President");
   const [clubId, setClubId] = useState("");
   const [clubName, setClubName] = useState("");
   const [clubCategory, setClubCategory] = useState("");
@@ -3765,7 +5020,8 @@ function RequestRolePage() {
   const [message, setMessage] = useState("");
 
   const myPending = store.roleRequests.filter(
-    (r) => r.user_id === currentUser?.id && r.status === "pending"
+    (r) =>
+      r.user_id === currentUser?.id && r.status === "pending",
   );
 
   if (!isStudent) {
@@ -3783,11 +5039,18 @@ function RequestRolePage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (kind === "lead_existing" && !clubId) {
-      toast.error("Select a club", { description: "Choose the club you'd like to lead." });
+      toast.error("Select a club", {
+        description: "Choose the club you'd like to lead.",
+      });
       return;
     }
-    if (kind === "create_club" && (!clubName || !clubCategory)) {
-      toast.error("Missing details", { description: "Enter a club name and category." });
+    if (
+      kind === "create_club" &&
+      (!clubName || !clubCategory)
+    ) {
+      toast.error("Missing details", {
+        description: "Enter a club name and category.",
+      });
       return;
     }
     doSubmitRoleRequest({
@@ -3795,8 +5058,10 @@ function RequestRolePage() {
       requested_role: requestedRole,
       club_id: kind === "lead_existing" ? clubId : undefined,
       club_name: kind === "create_club" ? clubName : undefined,
-      club_category: kind === "create_club" ? clubCategory : undefined,
-      club_description: kind === "create_club" ? clubDescription : undefined,
+      club_category:
+        kind === "create_club" ? clubCategory : undefined,
+      club_description:
+        kind === "create_club" ? clubDescription : undefined,
       message: message || undefined,
     });
     navigate("/dashboard");
@@ -3808,12 +5073,17 @@ function RequestRolePage() {
         <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
           Organizer Access
         </p>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold">
+        <h1
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+          className="text-3xl font-semibold"
+        >
           Become a Club Organizer
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Want to run a club or take on an officer role? Submit a request to the Student Affairs office
-          (Super Admin). If approved, your account will be upgraded to a Club Admin.
+          Want to run a club or take on an officer role? Submit
+          a request to the Student Affairs office (Super Admin).
+          If approved, your account will be upgraded to a Club
+          Admin.
         </p>
       </div>
 
@@ -3821,7 +5091,8 @@ function RequestRolePage() {
         <div className="flex items-center gap-3 p-4 bg-accent/10 border border-accent/30 rounded-lg">
           <Hourglass className="size-5 text-accent shrink-0" />
           <p className="text-sm text-foreground">
-            You have <strong>{myPending.length}</strong> pending request
+            You have <strong>{myPending.length}</strong> pending
+            request
             {myPending.length !== 1 ? "s" : ""} awaiting review.
           </p>
         </div>
@@ -3830,8 +5101,14 @@ function RequestRolePage() {
       <Card>
         <form onSubmit={handleSubmit}>
           <CardHeader>
-            <CardTitle style={{ fontFamily: "'Outfit', sans-serif" }}>Request details</CardTitle>
-            <CardDescription>Tell us what you'd like to do.</CardDescription>
+            <CardTitle
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+            >
+              Request details
+            </CardTitle>
+            <CardDescription>
+              Tell us what you'd like to do.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -3845,7 +5122,9 @@ function RequestRolePage() {
                 }`}
               >
                 <Plus className="size-5 text-primary mb-2" />
-                <p className="text-sm font-medium">Create a new club</p>
+                <p className="text-sm font-medium">
+                  Create a new club
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Start a brand-new club and become its founder.
                 </p>
@@ -3860,7 +5139,9 @@ function RequestRolePage() {
                 }`}
               >
                 <UserCog className="size-5 text-primary mb-2" />
-                <p className="text-sm font-medium">Officer of an existing club</p>
+                <p className="text-sm font-medium">
+                  Officer of an existing club
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Become President, Secretary, etc. of a club.
                 </p>
@@ -3869,18 +5150,25 @@ function RequestRolePage() {
 
             <div className="space-y-1.5">
               <Label>Requested Role</Label>
-              <Select value={requestedRole} onValueChange={setRequestedRole}>
+              <Select
+                value={requestedRole}
+                onValueChange={setRequestedRole}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["President", "Vice President", "General Secretary", "Treasurer", "Organizing Secretary"].map(
-                    (r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
-                      </SelectItem>
-                    )
-                  )}
+                  {[
+                    "President",
+                    "Vice President",
+                    "General Secretary",
+                    "Treasurer",
+                    "Organizing Secretary",
+                  ].map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -3888,7 +5176,10 @@ function RequestRolePage() {
             {kind === "lead_existing" ? (
               <div className="space-y-1.5">
                 <Label>Club</Label>
-                <Select value={clubId} onValueChange={setClubId}>
+                <Select
+                  value={clubId}
+                  onValueChange={setClubId}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a club" />
                   </SelectTrigger>
@@ -3908,23 +5199,33 @@ function RequestRolePage() {
                   <Input
                     placeholder="e.g. IUB Robotics Club"
                     value={clubName}
-                    onChange={(e) => setClubName(e.target.value)}
+                    onChange={(e) =>
+                      setClubName(e.target.value)
+                    }
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Category</Label>
-                  <Select value={clubCategory} onValueChange={setClubCategory}>
+                  <Select
+                    value={clubCategory}
+                    onValueChange={setClubCategory}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {["Technology", "Academic", "Arts & Culture", "Social", "Sports", "Business"].map(
-                        (cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        )
-                      )}
+                      {[
+                        "Technology",
+                        "Academic",
+                        "Arts & Culture",
+                        "Social",
+                        "Sports",
+                        "Business",
+                      ].map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -3933,7 +5234,9 @@ function RequestRolePage() {
                   <Textarea
                     placeholder="What is this club about? What activities will it run?"
                     value={clubDescription}
-                    onChange={(e) => setClubDescription(e.target.value)}
+                    onChange={(e) =>
+                      setClubDescription(e.target.value)
+                    }
                     rows={3}
                   />
                 </div>
@@ -3951,10 +5254,17 @@ function RequestRolePage() {
             </div>
           </CardContent>
           <CardFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(-1)}
+            >
               Cancel
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90">
+            <Button
+              type="submit"
+              className="bg-primary hover:bg-primary/90"
+            >
               Submit Request
             </Button>
           </CardFooter>
@@ -3965,11 +5275,19 @@ function RequestRolePage() {
 }
 
 function SuperAdminPage() {
-  const { store, doDeleteEvent, doDeleteClub, doReviewRoleRequest, doChangeUserRole } = useData();
+  const {
+    store,
+    doDeleteEvent,
+    doDeleteClub,
+    doReviewRoleRequest,
+    doChangeUserRole,
+  } = useData();
   const [tab, setTab] = useState("requests");
   const [search, setSearch] = useState("");
 
-  const pendingRoleRequests = store.roleRequests.filter((r) => r.status === "pending");
+  const pendingRoleRequests = store.roleRequests.filter(
+    (r) => r.status === "pending",
+  );
 
   const allEvents = store.events.filter((e) => {
     const q = search.toLowerCase();
@@ -3981,44 +5299,85 @@ function SuperAdminPage() {
   });
   const allUsers = store.users.filter((u) => {
     const q = search.toLowerCase();
-    return !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+    return (
+      !q ||
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    );
   });
 
   const totalRegistrations = store.registrations.length;
-  const pendingAllRequests = store.memberships.filter((m) => m.status === "pending").length;
+  const pendingAllRequests = store.memberships.filter(
+    (m) => m.status === "pending",
+  ).length;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div>
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">Super Admin</p>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold">
+        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+          Super Admin
+        </p>
+        <h1
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+          className="text-3xl font-semibold"
+        >
           Admin Console
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">System-wide management dashboard</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          System-wide management dashboard
+        </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Users} label="Total Users" value={store.users.length} />
-        <StatCard icon={Globe} label="Active Clubs" value={store.clubs.length} color="accent" />
-        <StatCard icon={CalendarDays} label="Total Events" value={store.events.length} color="green" />
-        <StatCard icon={Ticket} label="Registrations" value={totalRegistrations} color="purple" />
+        <StatCard
+          icon={Users}
+          label="Total Users"
+          value={store.users.length}
+        />
+        <StatCard
+          icon={Globe}
+          label="Active Clubs"
+          value={store.clubs.length}
+          color="accent"
+        />
+        <StatCard
+          icon={CalendarDays}
+          label="Total Events"
+          value={store.events.length}
+          color="green"
+        />
+        <StatCard
+          icon={Ticket}
+          label="Registrations"
+          value={totalRegistrations}
+          color="purple"
+        />
       </div>
 
-      {(pendingRoleRequests.length > 0 || pendingAllRequests > 0) && (
+      {(pendingRoleRequests.length > 0 ||
+        pendingAllRequests > 0) && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-4 bg-accent/10 border border-accent/30 rounded-lg">
           <AlertCircle className="size-5 text-accent shrink-0" />
           <p className="text-sm text-foreground">
             {pendingRoleRequests.length > 0 && (
               <>
-                <strong>{pendingRoleRequests.length}</strong> organizer request
-                {pendingRoleRequests.length !== 1 ? "s" : ""} awaiting your review.
+                <strong>{pendingRoleRequests.length}</strong>{" "}
+                organizer request
+                {pendingRoleRequests.length !== 1
+                  ? "s"
+                  : ""}{" "}
+                awaiting your review.
               </>
             )}
-            {pendingRoleRequests.length > 0 && pendingAllRequests > 0 && " · "}
+            {pendingRoleRequests.length > 0 &&
+              pendingAllRequests > 0 &&
+              " · "}
             {pendingAllRequests > 0 && (
               <>
-                <strong>{pendingAllRequests}</strong> club membership request
-                {pendingAllRequests !== 1 ? "s" : ""} across all clubs.
+                <strong>{pendingAllRequests}</strong> club
+                membership request
+                {pendingAllRequests !== 1 ? "s" : ""} across all
+                clubs.
               </>
             )}
           </p>
@@ -4038,24 +5397,49 @@ function SuperAdminPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="bg-muted">
           <TabsTrigger value="requests">
-            Requests{pendingRoleRequests.length > 0 ? ` (${pendingRoleRequests.length})` : ""}
+            Requests
+            {pendingRoleRequests.length > 0
+              ? ` (${pendingRoleRequests.length})`
+              : ""}
           </TabsTrigger>
-          <TabsTrigger value="events">Events ({allEvents.length})</TabsTrigger>
-          <TabsTrigger value="clubs">Clubs ({allClubs.length})</TabsTrigger>
-          <TabsTrigger value="users">Users ({allUsers.length})</TabsTrigger>
+          <TabsTrigger value="events">
+            Events ({allEvents.length})
+          </TabsTrigger>
+          <TabsTrigger value="clubs">
+            Clubs ({allClubs.length})
+          </TabsTrigger>
+          <TabsTrigger value="users">
+            Users ({allUsers.length})
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="requests" className="mt-4 space-y-3">
+        <TabsContent
+          value="requests"
+          className="mt-4 space-y-3"
+        >
           {store.roleRequests.length === 0 ? (
-            <EmptyState icon={BadgeCheck} title="No organizer requests" description="Student requests to lead or create clubs will appear here." />
+            <EmptyState
+              icon={BadgeCheck}
+              title="No organizer requests"
+              description="Student requests to lead or create clubs will appear here."
+            />
           ) : (
             [...store.roleRequests]
-              .sort((a, b) => b.created_at.localeCompare(a.created_at))
+              .sort((a, b) =>
+                b.created_at.localeCompare(a.created_at),
+              )
               .map((r) => {
-                const applicant = store.users.find((u) => u.id === r.user_id);
-                const club = r.club_id ? store.clubs.find((c) => c.id === r.club_id) : null;
+                const applicant = store.users.find(
+                  (u) => u.id === r.user_id,
+                );
+                const club = r.club_id
+                  ? store.clubs.find((c) => c.id === r.club_id)
+                  : null;
                 return (
-                  <div key={r.id} className="bg-card border border-border rounded-lg p-4">
+                  <div
+                    key={r.id}
+                    className="bg-card border border-border rounded-lg p-4"
+                  >
                     <div className="flex items-start gap-3">
                       <Avatar className="size-9 shrink-0">
                         <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
@@ -4064,9 +5448,16 @@ function SuperAdminPage() {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium">{applicant?.name}</p>
-                          <Badge variant="outline" className="text-[10px] font-mono">
-                            {r.kind === "create_club" ? "New Club" : "Officer Role"}
+                          <p className="text-sm font-medium">
+                            {applicant?.name}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono"
+                          >
+                            {r.kind === "create_club"
+                              ? "New Club"
+                              : "Officer Role"}
                           </Badge>
                           <Badge
                             variant="outline"
@@ -4074,22 +5465,32 @@ function SuperAdminPage() {
                               r.status === "pending"
                                 ? "text-foreground border-accent/50"
                                 : r.status === "approved"
-                                ? "text-foreground border-quaternary/50"
-                                : "text-destructive border-destructive/30"
+                                  ? "text-foreground border-quaternary/50"
+                                  : "text-destructive border-destructive/30"
                             }`}
                           >
                             {r.status}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                          {applicant?.email} · {r.created_at.slice(0, 10)}
+                          {applicant?.email} ·{" "}
+                          {r.created_at.slice(0, 10)}
                         </p>
                         <p className="text-sm mt-2">
-                          Requesting <strong>{r.requested_role}</strong>
+                          Requesting{" "}
+                          <strong>{r.requested_role}</strong>
                           {r.kind === "create_club" ? (
-                            <> of new club <strong>{r.club_name}</strong> ({r.club_category})</>
+                            <>
+                              {" "}
+                              of new club{" "}
+                              <strong>{r.club_name}</strong> (
+                              {r.club_category})
+                            </>
                           ) : (
-                            <> of <strong>{club?.name}</strong></>
+                            <>
+                              {" "}
+                              of <strong>{club?.name}</strong>
+                            </>
                           )}
                         </p>
                         {r.club_description && (
@@ -4107,7 +5508,12 @@ function SuperAdminPage() {
                             <Button
                               size="sm"
                               className="bg-primary hover:bg-primary/90"
-                              onClick={() => doReviewRoleRequest(r.id, "approved")}
+                              onClick={() =>
+                                doReviewRoleRequest(
+                                  r.id,
+                                  "approved",
+                                )
+                              }
                             >
                               <CheckCircle2 className="size-3.5 mr-1" />
                               Approve
@@ -4116,7 +5522,12 @@ function SuperAdminPage() {
                               size="sm"
                               variant="outline"
                               className="text-destructive"
-                              onClick={() => doReviewRoleRequest(r.id, "rejected")}
+                              onClick={() =>
+                                doReviewRoleRequest(
+                                  r.id,
+                                  "rejected",
+                                )
+                              }
                             >
                               <XCircle className="size-3.5 mr-1" />
                               Reject
@@ -4136,24 +5547,42 @@ function SuperAdminPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-mono">Event</TableHead>
-                  <TableHead className="text-xs font-mono">Club</TableHead>
-                  <TableHead className="text-xs font-mono">Date</TableHead>
-                  <TableHead className="text-xs font-mono">Status</TableHead>
-                  <TableHead className="text-xs font-mono">Regs</TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Event
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Club
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Date
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Status
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Regs
+                  </TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {allEvents.map((e) => {
-                  const club = store.clubs.find((c) => c.id === e.club_id);
-                  const regs = store.registrations.filter((r) => r.event_id === e.id).length;
+                  const club = store.clubs.find(
+                    (c) => c.id === e.club_id,
+                  );
+                  const regs = store.registrations.filter(
+                    (r) => r.event_id === e.id,
+                  ).length;
                   return (
                     <TableRow key={e.id}>
                       <TableCell>
-                        <p className="text-sm font-medium line-clamp-1">{e.title}</p>
+                        <p className="text-sm font-medium line-clamp-1">
+                          {e.title}
+                        </p>
                       </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{club?.short_name}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {club?.short_name}
+                      </TableCell>
                       <TableCell className="text-xs font-mono text-muted-foreground">
                         {format(parseISO(e.date), "d MMM yyyy")}
                       </TableCell>
@@ -4164,31 +5593,47 @@ function SuperAdminPage() {
                             e.status === "published"
                               ? "text-foreground border-quaternary/40"
                               : e.status === "cancelled"
-                              ? "text-destructive border-destructive/30"
-                              : "text-muted-foreground"
+                                ? "text-destructive border-destructive/30"
+                                : "text-muted-foreground"
                           }`}
                         >
                           {e.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs font-mono">{regs}</TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {regs}
+                      </TableCell>
                       <TableCell>
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="size-7 text-destructive">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-destructive"
+                            >
                               <Trash2 className="size-3.5" />
                             </Button>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
-                              <DialogTitle>Delete event?</DialogTitle>
+                              <DialogTitle>
+                                Delete event?
+                              </DialogTitle>
                               <DialogDescription>
-                                Permanently delete "{e.title}" and all its registrations.
+                                Permanently delete "{e.title}"
+                                and all its registrations.
                               </DialogDescription>
                             </DialogHeader>
                             <DialogFooter>
-                              <Button variant="outline">Cancel</Button>
-                              <Button variant="destructive" onClick={() => doDeleteEvent(e.id)}>
+                              <Button variant="outline">
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                onClick={() =>
+                                  doDeleteEvent(e.id)
+                                }
+                              >
                                 Delete
                               </Button>
                             </DialogFooter>
@@ -4208,46 +5653,82 @@ function SuperAdminPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-mono">Club</TableHead>
-                  <TableHead className="text-xs font-mono">Category</TableHead>
-                  <TableHead className="text-xs font-mono">Admin</TableHead>
-                  <TableHead className="text-xs font-mono">Members</TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Club
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Category
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Admin
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Members
+                  </TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {allClubs.map((c) => {
-                  const admin = store.users.find((u) => u.id === c.admin_user_id);
+                  const admin = store.users.find(
+                    (u) => u.id === c.admin_user_id,
+                  );
                   return (
                     <TableRow key={c.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className="size-8 rounded overflow-hidden bg-muted shrink-0">
-                            <ImageWithFallback src={c.cover_url} alt={c.name} className="w-full h-full object-cover" />
+                            <ImageWithFallback
+                              src={c.cover_url}
+                              alt={c.name}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
-                          <p className="text-sm font-medium">{c.name}</p>
+                          <p className="text-sm font-medium">
+                            {c.name}
+                          </p>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{c.category}</TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{admin?.name}</TableCell>
-                      <TableCell className="text-xs font-mono">{c.member_count}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {c.category}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {admin?.name}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">
+                        {c.member_count}
+                      </TableCell>
                       <TableCell>
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="size-7 text-destructive">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-destructive"
+                            >
                               <Trash2 className="size-3.5" />
                             </Button>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
-                              <DialogTitle>Remove club?</DialogTitle>
+                              <DialogTitle>
+                                Remove club?
+                              </DialogTitle>
                               <DialogDescription>
-                                Permanently remove "{c.name}", its events, and all memberships.
+                                Permanently remove "{c.name}",
+                                its events, and all memberships.
                               </DialogDescription>
                             </DialogHeader>
                             <DialogFooter>
-                              <Button variant="outline">Cancel</Button>
-                              <Button variant="destructive" onClick={() => doDeleteClub(c.id)}>
+                              <Button variant="outline">
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                onClick={() =>
+                                  doDeleteClub(c.id)
+                                }
+                              >
                                 Remove
                               </Button>
                             </DialogFooter>
@@ -4267,10 +5748,18 @@ function SuperAdminPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-mono">User</TableHead>
-                  <TableHead className="text-xs font-mono">Department</TableHead>
-                  <TableHead className="text-xs font-mono">Email</TableHead>
-                  <TableHead className="text-xs font-mono">Role / Change</TableHead>
+                  <TableHead className="text-xs font-mono">
+                    User
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Department
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Email
+                  </TableHead>
+                  <TableHead className="text-xs font-mono">
+                    Role / Change
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -4284,29 +5773,51 @@ function SuperAdminPage() {
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="text-sm font-medium">{u.name}</p>
-                          <p className="text-[10px] text-muted-foreground font-mono">{u.student_id}</p>
+                          <p className="text-sm font-medium">
+                            {u.name}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground font-mono">
+                            {u.student_id}
+                          </p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs font-mono text-muted-foreground">{u.department}</TableCell>
-                    <TableCell className="text-xs font-mono text-muted-foreground">{u.email}</TableCell>
+                    <TableCell className="text-xs font-mono text-muted-foreground">
+                      {u.department}
+                    </TableCell>
+                    <TableCell className="text-xs font-mono text-muted-foreground">
+                      {u.email}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={`text-[10px] font-mono ${roleBadge(u.role)}`}>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] font-mono ${roleBadge(u.role)}`}
+                        >
                           {u.role.replace("_", " ")}
                         </Badge>
                         <Select
                           value={u.role}
-                          onValueChange={(v) => doChangeUserRole(u.id, v as UserRole)}
+                          onValueChange={(v) =>
+                            doChangeUserRole(
+                              u.id,
+                              v as UserRole,
+                            )
+                          }
                         >
                           <SelectTrigger className="h-7 w-[130px] text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="student">Student</SelectItem>
-                            <SelectItem value="club_admin">Club Admin</SelectItem>
-                            <SelectItem value="super_admin">Super Admin</SelectItem>
+                            <SelectItem value="student">
+                              Student
+                            </SelectItem>
+                            <SelectItem value="club_admin">
+                              Club Admin
+                            </SelectItem>
+                            <SelectItem value="super_admin">
+                              Super Admin
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -4331,7 +5842,13 @@ export default function App() {
         <Toaster
           richColors
           position="top-right"
-          toastOptions={{ style: { fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", fontSize: "13px" } }}
+          toastOptions={{
+            style: {
+              fontFamily:
+                "'Plus Jakarta Sans', system-ui, sans-serif",
+              fontSize: "13px",
+            },
+          }}
         />
         <AppContent />
       </HashRouter>
@@ -4346,7 +5863,10 @@ function AppContent() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route
+        path="/forgot-password"
+        element={<ForgotPasswordPage />}
+      />
 
       <Route
         path="/*"
@@ -4354,14 +5874,38 @@ function AppContent() {
           <ProtectedRoute>
             <AppShell>
               <Routes>
-                <Route path="dashboard" element={<DashboardPage />} />
-                <Route path="events" element={<EventFeedPage />} />
-                <Route path="events/:id" element={<EventDetailPage />} />
-                <Route path="clubs" element={<ClubDirectoryPage />} />
-                <Route path="clubs/:id" element={<ClubDetailPage />} />
-                <Route path="notifications" element={<NotificationsPage />} />
-                <Route path="profile" element={<ProfilePage />} />
-                <Route path="request-role" element={<RequestRolePage />} />
+                <Route
+                  path="dashboard"
+                  element={<DashboardPage />}
+                />
+                <Route
+                  path="events"
+                  element={<EventFeedPage />}
+                />
+                <Route
+                  path="events/:id"
+                  element={<EventDetailPage />}
+                />
+                <Route
+                  path="clubs"
+                  element={<ClubDirectoryPage />}
+                />
+                <Route
+                  path="clubs/:id"
+                  element={<ClubDetailPage />}
+                />
+                <Route
+                  path="notifications"
+                  element={<NotificationsPage />}
+                />
+                <Route
+                  path="profile"
+                  element={<ProfilePage />}
+                />
+                <Route
+                  path="request-role"
+                  element={<RequestRolePage />}
+                />
 
                 <Route
                   path="admin/dashboard"
@@ -4429,15 +5973,24 @@ function AppContent() {
                   }
                 />
 
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route
+                  path="*"
+                  element={<Navigate to="/dashboard" replace />}
+                />
+                <Route
+                  index
+                  element={<Navigate to="/dashboard" replace />}
+                />
               </Routes>
             </AppShell>
           </ProtectedRoute>
         }
       />
 
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route
+        path="/"
+        element={<Navigate to="/login" replace />}
+      />
     </Routes>
   );
 }
