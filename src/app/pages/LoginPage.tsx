@@ -18,6 +18,7 @@ import { roleHome } from "../context/AuthContext";
 import { AuthBrandPanel } from "../components/AuthBrandPanel";
 import { GoogleIcon } from "../components/GoogleIcon";
 import { ComicButton } from "../components/ComicButton";
+import { isFirebaseConfigured } from "../lib/firebase";
 
 const DEMO_ACCOUNTS = [
   {
@@ -161,28 +162,30 @@ export function LoginPage() {
             Continue with Google (Coming soon)
           </Button>
 
-          <div className="mt-6 rounded-lg border border-border bg-muted/40 p-3">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono mb-2">
-              Demo accounts
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <Button
-                  key={acc.email}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => {
-                    setEmail(acc.email);
-                    setPassword(acc.password);
-                  }}
-                >
-                  {acc.label}
-                </Button>
-              ))}
+          {!isFirebaseConfigured && (
+            <div className="mt-6 rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono mb-2">
+                Demo accounts
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {DEMO_ACCOUNTS.map((acc) => (
+                  <Button
+                    key={acc.email}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      setEmail(acc.email);
+                      setPassword(acc.password);
+                    }}
+                  >
+                    {acc.label}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <p className="text-sm text-center text-muted-foreground mt-6">
             {"Don't have an account? "}
@@ -201,4 +204,3 @@ export function LoginPage() {
 }
 
 // ─── Register ─────────────────────────────────────────────────────────────────
-
