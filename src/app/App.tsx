@@ -51,6 +51,8 @@ import {
   Share2,
   CalendarPlus,
   Download,
+  Repeat,
+  MailCheck,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -114,6 +116,8 @@ import {
   shareEvent,
   checkInCode,
   parseCheckInCode,
+  getOccurrences,
+  recurrenceLabel,
 } from "@/app/lib/eventUtils";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -156,13 +160,15 @@ import {
   changeUserRole,
   seedCounters,
   setCheckIn,
+  toggleEventException,
+  sendDigest,
 } from "@/app/lib/store";
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 // The in-memory store is mirrored to localStorage so demo data survives reloads.
 // Bump the version suffix whenever the data shape changes to discard stale state.
-const STORE_KEY = "iub_hub_store_v1";
-const AUTH_KEY = "iub_hub_auth_v1";
+const STORE_KEY = "iub_hub_store_v2";
+const AUTH_KEY = "iub_hub_auth_v2";
 
 function loadStore(): StoreState {
   try {
@@ -221,6 +227,8 @@ interface DataContextValue {
   doReviewRoleRequest: (requestId: string, action: "approved" | "rejected") => void;
   doChangeUserRole: (userId: string, newRole: UserRole) => void;
   doCheckIn: (registrationId: string, value: boolean) => void;
+  doToggleException: (eventId: string, date: string) => void;
+  doSendDigest: () => void;
 }
 
 const DataContext = createContext<DataContextValue>({} as DataContextValue);
@@ -437,6 +445,27 @@ function Providers({ children }: { children: React.ReactNode }) {
     setStore((s) => setCheckIn(s, registrationId, value));
   }, []);
 
+  const doToggleException = useCallback((eventId: string, date: string) => {
+    setStore((s) => {
+      const wasSkipped = (s.events.find((e) => e.id === eventId)?.exception_dates ?? []).includes(date);
+      const next = toggleEventException(s, eventId, date);
+      toast.info(wasSkipped ? "Session restored" : "Session cancelled", {
+        description: `${wasSkipped ? "Re-added" : "Skipped"} the ${date} occurrence.`,
+      });
+      return next;
+    });
+  }, []);
+
+  const doSendDigest = useCallback(() => {
+    setStore((s) => {
+      const next = sendDigest(s, currentUserId ?? "");
+      toast.success("Digest sent", {
+        description: "Your reminder digest is in your notifications.",
+      });
+      return next;
+    });
+  }, [currentUserId]);
+
   const authValue: AuthContextValue = {
     currentUser,
     switchRole,
@@ -465,6 +494,8 @@ function Providers({ children }: { children: React.ReactNode }) {
     doReviewRoleRequest,
     doChangeUserRole,
     doCheckIn,
+    doToggleException,
+    doSendDigest,
   };
 
   return (
@@ -1572,7 +1603,7 @@ function ForgotPasswordPage() {
 // ─── Student Dashboard ────────────────────────────────────────────────────────
 
 function DashboardPage() {
-  const { store } = useData();
+  const { store, doSendDigest } = useData();
   const { currentUser, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -1603,16 +1634,21 @@ function DashboardPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
-      <div>
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
-          Welcome back
-        </p>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold text-foreground">
-          {currentUser?.name?.split(" ")[0]}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {currentUser?.department} · {currentUser?.student_id}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+            Welcome back
+          </p>
+          <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-semibold text-foreground">
+            {currentUser?.name?.split(" ")[0]}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {currentUser?.department} · {currentUser?.student_id}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="shrink-0" onClick={doSendDigest}>
+          <MailCheck className="size-4 mr-2" /> Email me a digest
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1804,7 +1840,7 @@ function EventFeedPage() {
 
 function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { store, doRegister, doCancel } = useData();
+  const { store, doRegister, doCancel, doToggleException } = useData();
   const { currentUser, isClubAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -1895,6 +1931,53 @@ function EventDetailPage() {
               {event.description}
             </p>
           </div>
+
+          {recurrenceLabel(event) && (
+            <div>
+              <Separator className="mb-6" />
+              <div className="flex items-center gap-2 mb-3">
+                <Repeat className="size-4 text-primary" />
+                <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="font-semibold text-lg">
+                  Schedule
+                </h2>
+                <Badge variant="outline" className="text-xs font-mono">
+                  {recurrenceLabel(event)}
+                </Badge>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {getOccurrences(event).map((occ) => (
+                  <div
+                    key={occ.date}
+                    className={`flex items-center justify-between gap-2 p-2.5 rounded-lg border ${
+                      occ.skipped
+                        ? "border-border/50 bg-muted/40 text-muted-foreground line-through"
+                        : "border-border bg-card"
+                    }`}
+                  >
+                    <span className="text-sm font-medium">
+                      {format(parseISO(occ.date), "EEE, d MMM yyyy")}
+                    </span>
+                    {isAdmin ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs no-underline"
+                        onClick={() => doToggleException(event.id, occ.date)}
+                      >
+                        {occ.skipped ? "Restore" : "Cancel"}
+                      </Button>
+                    ) : (
+                      occ.skipped && (
+                        <Badge variant="outline" className="text-xs font-mono text-destructive border-destructive/30">
+                          Cancelled
+                        </Badge>
+                      )
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {isAdmin && (
             <div className="flex gap-2 pt-2">
@@ -2952,12 +3035,23 @@ function EventFormPage() {
     poster_url: existingEvent?.poster_url ?? "",
     tags: (existingEvent?.tags ?? []).join(", "),
     status: (existingEvent?.status ?? "published") as "draft" | "published",
+    recurrence: (existingEvent?.recurrence ?? "none") as
+      | "none"
+      | "daily"
+      | "weekly"
+      | "monthly",
+    recurrence_count: existingEvent?.recurrence_count ?? 4,
   });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!myClub) return;
     const tags = form.tags.split(",").map((t) => t.trim()).filter(Boolean);
+    const recurrenceFields = {
+      recurrence: form.recurrence,
+      recurrence_count:
+        form.recurrence === "none" ? 1 : Math.max(1, Number(form.recurrence_count)),
+    };
 
     if (isEdit && existingEvent) {
       doUpdateEvent(existingEvent.id, {
@@ -2971,6 +3065,7 @@ function EventFormPage() {
         poster_url: form.poster_url,
         tags,
         status: form.status,
+        ...recurrenceFields,
       });
     } else {
       doCreateEvent({
@@ -2986,6 +3081,8 @@ function EventFormPage() {
         status: form.status,
         club_id: myClub.id,
         created_by: currentUser!.id,
+        ...recurrenceFields,
+        exception_dates: [],
       });
     }
     navigate("/admin/events");
@@ -3088,6 +3185,47 @@ function EventFormPage() {
             </Select>
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Repeats</Label>
+            <Select
+              value={form.recurrence}
+              onValueChange={(v) =>
+                setForm({ ...form, recurrence: v as typeof form.recurrence })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Does not repeat</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {form.recurrence !== "none" && (
+            <div className="space-y-1.5">
+              <Label>Number of sessions</Label>
+              <Input
+                type="number"
+                min={1}
+                max={52}
+                value={form.recurrence_count}
+                onChange={(e) =>
+                  setForm({ ...form, recurrence_count: Number(e.target.value) })
+                }
+              />
+            </div>
+          )}
+        </div>
+        {form.recurrence !== "none" && (
+          <p className="text-xs text-muted-foreground -mt-2">
+            Creates a series of {Math.max(1, Number(form.recurrence_count))} {form.recurrence} sessions
+            starting from the date above. You can cancel individual sessions later from the event page.
+          </p>
+        )}
         <div className="space-y-1.5">
           <Label>Poster Image URL</Label>
           <Input

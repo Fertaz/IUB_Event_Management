@@ -42,6 +42,12 @@ export interface Event {
   club_id: string;
   created_by: string;
   tags: string[];
+  // Recurrence. `date` is always the first occurrence. When recurrence is not
+  // "none", the event repeats `recurrence_count` times at the given cadence,
+  // skipping any dates listed in `exception_dates` (exception rules).
+  recurrence?: "none" | "daily" | "weekly" | "monthly";
+  recurrence_count?: number;
+  exception_dates?: string[];
 }
 
 export interface Registration {
@@ -324,6 +330,9 @@ const EVENTS: Event[] = [
     club_id: "club_3",
     created_by: "user_5",
     tags: ["Photography", "Cultural", "Outdoor"],
+    recurrence: "weekly",
+    recurrence_count: 4,
+    exception_dates: ["2026-08-05"],
   },
   {
     id: "event_5",
@@ -990,6 +999,66 @@ export function deleteClubAdmin(state: StoreState, clubId: string): StoreState {
     memberships: state.memberships.filter((m) => m.club_id !== clubId),
     events: state.events.filter((e) => e.club_id !== clubId),
   };
+}
+
+// Recurring events: add/remove a single date from an event's exception list,
+// letting an organiser cancel just one occurrence of a repeating series.
+export function toggleEventException(
+  state: StoreState,
+  eventId: string,
+  date: string
+): StoreState {
+  const event = state.events.find((e) => e.id === eventId);
+  if (!event) return state;
+  const current = event.exception_dates ?? [];
+  const next = current.includes(date)
+    ? current.filter((d) => d !== date)
+    : [...current, date];
+  return {
+    ...state,
+    events: state.events.map((e) =>
+      e.id === eventId ? { ...e, exception_dates: next } : e
+    ),
+  };
+}
+
+// Daily digest / reminder: compile the user's upcoming registered events into a
+// single notification, simulating the push/email digest the backend would send.
+export function sendDigest(state: StoreState, userId: string): StoreState {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const myEventIds = new Set(
+    state.registrations
+      .filter((r) => r.user_id === userId && r.status === "registered")
+      .map((r) => r.event_id)
+  );
+  const upcoming = state.events
+    .filter(
+      (e) =>
+        myEventIds.has(e.id) && e.status !== "cancelled" && e.date >= todayIso
+    )
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const message =
+    upcoming.length === 0
+      ? "Your daily digest: you have no upcoming events registered. Browse events to find something to join!"
+      : `Your daily digest: ${upcoming.length} upcoming event${
+          upcoming.length > 1 ? "s" : ""
+        } — ${upcoming
+          .slice(0, 3)
+          .map((e) => `${e.title} (${e.date})`)
+          .join(", ")}${upcoming.length > 3 ? ", and more." : "."}`;
+
+  const digest: Notification = {
+    id: newNotifId(),
+    user_id: userId,
+    type: "general",
+    message,
+    is_read: false,
+    created_at: new Date().toISOString(),
+    event_id: upcoming[0]?.id,
+  };
+
+  return { ...state, notifications: [...state.notifications, digest] };
 }
 
 export function markNotificationsRead(state: StoreState, userId: string): StoreState {

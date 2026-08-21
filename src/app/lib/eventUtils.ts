@@ -3,6 +3,49 @@
 // public event links. Used by EventDetailPage (and reusable elsewhere).
 
 import type { Event, Club } from "@/app/lib/store";
+import { addDays, addWeeks, addMonths, format, parseISO } from "date-fns";
+
+// ─── Recurrence ───────────────────────────────────────────────────────────────
+// Expand an event's recurrence rule into concrete occurrence dates ("YYYY-MM-DD"),
+// honouring exception_dates. Non-recurring events return their single date.
+export interface Occurrence {
+  date: string;
+  skipped: boolean; // true if this date is in exception_dates
+}
+
+export function getOccurrences(event: Event): Occurrence[] {
+  const recurrence = event.recurrence ?? "none";
+  const count = recurrence === "none" ? 1 : Math.max(1, event.recurrence_count ?? 1);
+  const exceptions = new Set(event.exception_dates ?? []);
+  const start = parseISO(event.date);
+  const step = (i: number): Date => {
+    switch (recurrence) {
+      case "daily":
+        return addDays(start, i);
+      case "weekly":
+        return addWeeks(start, i);
+      case "monthly":
+        return addMonths(start, i);
+      default:
+        return start;
+    }
+  };
+  const out: Occurrence[] = [];
+  for (let i = 0; i < count; i++) {
+    const date = format(step(i), "yyyy-MM-dd");
+    out.push({ date, skipped: exceptions.has(date) });
+  }
+  return out;
+}
+
+// Human-readable label for a recurrence rule, e.g. "Repeats weekly · 6 sessions".
+export function recurrenceLabel(event: Event): string | null {
+  const recurrence = event.recurrence ?? "none";
+  if (recurrence === "none") return null;
+  const count = event.recurrence_count ?? 1;
+  const word = { daily: "daily", weekly: "weekly", monthly: "monthly" }[recurrence];
+  return `Repeats ${word} · ${count} session${count > 1 ? "s" : ""}`;
+}
 
 // Turn "2026-08-01" + "09:00" into a floating calendar timestamp "20260801T090000".
 // Floating (no timezone/Z) means calendar apps interpret it in the user's local
