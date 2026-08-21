@@ -83,6 +83,48 @@ export async function deleteMember(
   );
 }
 
+export interface AddMemberPayload {
+  name: string;
+  email: string;
+  student_id: string;
+  department: string;
+  password?: string;
+  role?: string;
+}
+
+/**
+ * Adds a user to a club as an approved member.
+ * If the email already exists, the existing user account is used.
+ * Otherwise a new user record is created (password is required).
+ */
+export async function addMember(
+  clubId: string,
+  payload: AddMemberPayload,
+): Promise<GetClubMembersResponse & { membershipId: string }> {
+  return apiClient(`/clubs/${clubId}/members`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface UpdateMemberDetailsPayload {
+  name?: string;
+  email?: string;
+  password?: string;
+}
+
+/** Updates a member's user record (name, email and/or password). */
+export async function updateMemberDetails(
+  clubId: string,
+  membershipId: string,
+  payload: UpdateMemberDetailsPayload,
+): Promise<{ ok: boolean } & GetClubMembersResponse> {
+  return apiClient(`/clubs/${clubId}/members/${membershipId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 /**
  * RBAC permission map — mirrors the server-side ROLE_PERMISSIONS constant.
  * Use this on the frontend to gate UI elements by the current user's role.

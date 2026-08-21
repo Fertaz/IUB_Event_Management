@@ -47,4 +47,26 @@ export default defineConfig({
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ["**/*.svg", "**/*.csv"],
+
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router"],
+          "vendor-charts": ["recharts"],
+          "vendor-ui": [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-select",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-avatar",
+            "@radix-ui/react-separator",
+            "@radix-ui/react-label",
+            "@radix-ui/react-slot",
+          ],
+          "vendor-misc": ["date-fns", "lucide-react", "sonner", "qrcode.react"],
+        },
+      },
+    },
+  },
 });

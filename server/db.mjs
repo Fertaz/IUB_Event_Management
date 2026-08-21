@@ -871,6 +871,122 @@ export function assignRolesForClub(db, clubId) {
 }
 
 /**
+ * Adds a user as an approved member of a club.
+ * If the email already belongs to a user account, that account is reused.
+ * Otherwise, a new user record is created (password required in that case).
+ * Enforces exec-role limits and rejects duplicate memberships.
+ */
+export function addClubMember(db, clubId, payload) {
+  const { name, email, student_id, department, password, role = "Member" } = payload;
+
+  const club = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
+  if (!club) throw new Error("Club not found.");
+
+  if (!email) throw new Error("Email is required.");
+
+  let existingUser = db
+    .prepare("SELECT * FROM users WHERE lower(email) = lower(?) LIMIT 1")
+    .get(email);
+
+  let userId;
+  if (existingUser) {
+    userId = existingUser.id;
+  } else {
+    if (!password || password.length < 8) {
+      throw new Error("Password must be at least 8 characters for new users.");
+    }
+    if (!name) throw new Error("Name is required for new users.");
+    userId = nextId(db, "users", "user_");
+    db.prepare(`
+      INSERT INTO users (id, email, name, student_id, department, role, avatar, bio, password_hash)
+      VALUES (?, ?, ?, ?, ?, 'student', NULL, NULL, ?)
+    `).run(userId, email.trim(), name.trim(), (student_id || "").trim(), (department || "").trim(), sha256(password));
+  }
+
+  const dup = db
+    .prepare("SELECT id FROM memberships WHERE user_id = ? AND club_id = ?")
+    .get(userId, clubId);
+  if (dup) throw new Error("This user is already a member of this club.");
+
+  const EXEC_ROLE_LIMITS_LOCAL = {
+    President: 1,
+    "Vice President": 2,
+    "General Secretary": 1,
+    Treasurer: 1,
+    "Organizing Secretary": 1,
+  };
+  const limit = EXEC_ROLE_LIMITS_LOCAL[role];
+  if (limit !== undefined) {
+    const { count } = db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM memberships WHERE club_id = ? AND status = 'approved' AND role = ?",
+      )
+      .get(clubId, role);
+    if (count >= limit) {
+      throw new Error(`Role "${role}" is already at its maximum (${limit}) for this club.`);
+    }
+  }
+
+  const isExec = role in EXEC_ROLE_LIMITS_LOCAL;
+  const committeeType = isExec ? "executive" : "sub_committee";
+  const permissions = isExec
+    ? JSON.stringify(["manage_events", "manage_members", "view_reports"])
+    : role === "Event Manager"
+      ? JSON.stringify(["manage_events", "view_reports"])
+      : JSON.stringify(["view_reports"]);
+
+  const membershipId = nextId(db, "memberships", "mem_");
+  db.prepare(`
+    INSERT INTO memberships (id, user_id, club_id, status, applied_at, role, committee_type, permissions)
+    VALUES (?, ?, ?, 'approved', ?, ?, ?, ?)
+  `).run(membershipId, userId, clubId, new Date().toISOString(), role, committeeType, permissions);
+
+  db.prepare("UPDATE clubs SET member_count = member_count + 1 WHERE id = ?").run(clubId);
+
+  return membershipId;
+}
+
+/**
+ * Updates the user details (name, email, password) for the user attached to
+ * a membership. Any field that is absent/undefined in payload is left unchanged.
+ */
+export function updateMemberDetails(db, membershipId, payload) {
+  const mem = db.prepare("SELECT * FROM memberships WHERE id = ?").get(membershipId);
+  if (!mem) throw new Error("Membership not found.");
+
+  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(mem.user_id);
+  if (!user) throw new Error("User not found.");
+
+  const { name, email, password } = payload;
+
+  if (email && email.trim() !== user.email) {
+    const conflict = db
+      .prepare("SELECT id FROM users WHERE lower(email) = lower(?) AND id != ?")
+      .get(email.trim(), user.id);
+    if (conflict) throw new Error("Email already in use by another account.");
+  }
+
+  const setClauses = [];
+  const params = [];
+  if (name !== undefined && name !== null && String(name).trim()) {
+    setClauses.push("name = ?");
+    params.push(String(name).trim());
+  }
+  if (email !== undefined && email !== null && String(email).trim()) {
+    setClauses.push("email = ?");
+    params.push(String(email).trim());
+  }
+  if (password && String(password).length >= 8) {
+    setClauses.push("password_hash = ?");
+    params.push(sha256(String(password)));
+  }
+
+  if (setClauses.length === 0) return;
+  params.push(user.id);
+  db.prepare(`UPDATE users SET ${setClauses.join(", ")} WHERE id = ?`).run(...params);
+}
+
+/**
  * Deletes a single membership record (remove member from club).
  * Also updates the club's member_count.
  */

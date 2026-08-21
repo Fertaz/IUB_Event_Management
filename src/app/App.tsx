@@ -183,6 +183,8 @@ import {
   assignRoles as assignClubRolesApi,
   updateMemberRole as updateMemberRoleApi,
   deleteMember as deleteMemberApi,
+  addMember as addMemberApi,
+  updateMemberDetails as updateMemberDetailsApi,
   type GetClubMembersResponse,
   type MemberSummary,
 } from "./services/memberService";
@@ -5085,6 +5087,25 @@ function MemberRosterPage() {
   const [assigningRoles, setAssigningRoles] = useState(false);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
+  // ── Add Member dialog state ──────────────────────────────────────────────
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addEmail, setAddEmail] = useState("");
+  const [addStudentId, setAddStudentId] = useState("");
+  const [addDept, setAddDept] = useState("CSE");
+  const [addPassword, setAddPassword] = useState("");
+  const [addRole, setAddRole] = useState<ClubRole>("Member");
+  const [addSaving, setAddSaving] = useState(false);
+
+  // ── Edit Member dialog state ─────────────────────────────────────────────
+  const [editTarget, setEditTarget] = useState<MemberSummary | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  const DEPARTMENTS = ["CSE", "EEE", "BBA", "ENG", "Economics", "Architecture"];
+
   // Fetch members + authoritative count from the same DB query.
   const refresh = useCallback(async () => {
     if (!myClub) return;
@@ -5165,6 +5186,62 @@ function MemberRosterPage() {
     }
   }
 
+  async function handleAddMember() {
+    if (!myClub) return;
+    setAddSaving(true);
+    try {
+      const result = await addMemberApi(myClub.id, {
+        name: addName,
+        email: addEmail,
+        student_id: addStudentId,
+        department: addDept,
+        password: addPassword || undefined,
+        role: addRole,
+      });
+      setApiData(result);
+      toast.success("Member added", {
+        description: `${addName || addEmail} has been added to ${myClub.name}.`,
+      });
+      setAddOpen(false);
+      setAddName(""); setAddEmail(""); setAddStudentId("");
+      setAddDept("CSE"); setAddPassword(""); setAddRole("Member");
+    } catch (err) {
+      toast.error("Add failed", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setAddSaving(false);
+    }
+  }
+
+  function openEditDialog(mem: MemberSummary) {
+    setEditTarget(mem);
+    setEditName(mem.name);
+    setEditEmail(mem.email);
+    setEditPassword("");
+  }
+
+  async function handleEditMember() {
+    if (!myClub || !editTarget) return;
+    setEditSaving(true);
+    try {
+      const result = await updateMemberDetailsApi(myClub.id, editTarget.id, {
+        name: editName || undefined,
+        email: editEmail || undefined,
+        password: editPassword || undefined,
+      });
+      setApiData(result);
+      toast.success("Member updated");
+      setEditTarget(null);
+    } catch (err) {
+      toast.error("Update failed", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -5185,15 +5262,167 @@ function MemberRosterPage() {
           </p>
         </div>
 
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void handleAssignRoles()}
-          disabled={assigningRoles || loading || totalCount === 0}
-        >
-          {assigningRoles ? "Assigning…" : "Assign Roles"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus className="size-3.5 mr-1.5" /> Add Member
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void handleAssignRoles()}
+            disabled={assigningRoles || loading || totalCount === 0}
+          >
+            {assigningRoles ? "Assigning…" : "Assign Roles"}
+          </Button>
+        </div>
       </div>
+
+      {/* ── Add Member Dialog ── */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Member</DialogTitle>
+            <DialogDescription>
+              Enter the member's details. If the email already has an account,
+              that account will be linked. Otherwise a new account is created.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-xs font-mono">Full Name</Label>
+              <Input
+                value={addName}
+                onChange={(e) => setAddName(e.target.value)}
+                placeholder="e.g. Farhan Ahmed"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-mono">Email</Label>
+              <Input
+                type="email"
+                value={addEmail}
+                onChange={(e) => setAddEmail(e.target.value)}
+                placeholder="student@iub.edu.bd"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-mono">Student ID</Label>
+                <Input
+                  value={addStudentId}
+                  onChange={(e) => setAddStudentId(e.target.value)}
+                  placeholder="2321234"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-mono">Department</Label>
+                <Select value={addDept} onValueChange={setAddDept}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map((d) => (
+                      <SelectItem key={d} value={d}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-mono">
+                Password{" "}
+                <span className="text-muted-foreground">(required for new accounts)</span>
+              </Label>
+              <Input
+                type="password"
+                value={addPassword}
+                onChange={(e) => setAddPassword(e.target.value)}
+                placeholder="min. 8 characters"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-mono">Role</Label>
+              <Select value={addRole} onValueChange={(v) => setAddRole(v as ClubRole)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLUB_ROLES.map((r) => (
+                    <SelectItem key={r} value={r} className="text-xs font-mono">{r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleAddMember()}
+              disabled={addSaving || !addEmail}
+            >
+              {addSaving ? "Adding…" : "Add Member"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Member Dialog ── */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Member</DialogTitle>
+            <DialogDescription>
+              Update name, email, or password for {editTarget?.name}. Leave
+              password blank to keep it unchanged.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-xs font-mono">Full Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-mono">Email</Label>
+              <Input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-mono">
+                New Password{" "}
+                <span className="text-muted-foreground">(leave blank to keep)</span>
+              </Label>
+              <Input
+                type="password"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+                placeholder="min. 8 characters"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleEditMember()}
+              disabled={editSaving}
+            >
+              {editSaving ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {loading ? (
         <p className="text-sm text-muted-foreground py-8 text-center font-mono">
@@ -5268,43 +5497,54 @@ function MemberRosterPage() {
                   </TableCell>
 
                   <TableCell>
-                    {mem.user_id !== currentUser?.id && (
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 text-destructive hover:bg-destructive/8"
-                            disabled={removingId === mem.id}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Remove member?</DialogTitle>
-                            <DialogDescription>
-                              {mem.name} will be removed from{" "}
-                              {myClub?.name}. They can re-apply later.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter>
-                            <Button variant="outline">Cancel</Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 text-muted-foreground hover:text-foreground"
+                        onClick={() => openEditDialog(mem)}
+                        title="Edit member details"
+                      >
+                        <Edit3 className="size-3.5" />
+                      </Button>
+                      {mem.user_id !== currentUser?.id && (
+                        <Dialog>
+                          <DialogTrigger asChild>
                             <Button
-                              variant="destructive"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-destructive hover:bg-destructive/8"
                               disabled={removingId === mem.id}
-                              onClick={() =>
-                                void handleRemove(mem.id, mem.name)
-                              }
                             >
-                              {removingId === mem.id
-                                ? "Removing…"
-                                : "Remove"}
+                              <Trash2 className="size-3.5" />
                             </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    )}
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Remove member?</DialogTitle>
+                              <DialogDescription>
+                                {mem.name} will be removed from{" "}
+                                {myClub?.name}. They can re-apply later.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                              <Button variant="outline">Cancel</Button>
+                              <Button
+                                variant="destructive"
+                                disabled={removingId === mem.id}
+                                onClick={() =>
+                                  void handleRemove(mem.id, mem.name)
+                                }
+                              >
+                                {removingId === mem.id
+                                  ? "Removing…"
+                                  : "Remove"}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

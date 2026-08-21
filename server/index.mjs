@@ -15,6 +15,8 @@ import {
   updateMembershipRole,
   assignRolesForClub,
   deleteMembership,
+  addClubMember,
+  updateMemberDetails,
 } from "./db.mjs";
 
 const db = createDatabase();
@@ -163,6 +165,25 @@ async function handleRequest(req, res) {
       return;
     }
 
+    // POST /clubs/:clubId/members
+    // Body: { name, email, student_id, department, password?, role? }
+    // Adds an existing user (by email) or creates a new user+membership.
+    if (req.method === "POST" && membersMatch) {
+      const clubId = membersMatch[1];
+      const body = (await readBody(req)) || {};
+      try {
+        const membershipId = addClubMember(db, clubId, body);
+        const members = listClubMembers(db, clubId);
+        const totalCount = getClubMemberCount(db, clubId);
+        json(res, 201, { clubId, totalCount, members, membershipId });
+      } catch (err) {
+        json(res, 409, {
+          message: err instanceof Error ? err.message : "Add member failed",
+        });
+      }
+      return;
+    }
+
     // PUT /clubs/:clubId/members/:membershipId/role
     // Body: { role: ClubRole }
     const memberRoleMatch = url.pathname.match(
@@ -209,9 +230,26 @@ async function handleRequest(req, res) {
     }
 
     // DELETE /clubs/:clubId/members/:membershipId
+    // PUT    /clubs/:clubId/members/:membershipId  (update name / email / password)
     const memberDeleteMatch = url.pathname.match(
       /^\/clubs\/([^/]+)\/members\/([^/]+)$/,
     );
+    if (req.method === "PUT" && memberDeleteMatch) {
+      const clubId = memberDeleteMatch[1];
+      const membershipId = memberDeleteMatch[2];
+      const body = (await readBody(req)) || {};
+      try {
+        updateMemberDetails(db, membershipId, body);
+        const members = listClubMembers(db, clubId);
+        const totalCount = getClubMemberCount(db, clubId);
+        json(res, 200, { ok: true, clubId, totalCount, members });
+      } catch (err) {
+        json(res, 409, {
+          message: err instanceof Error ? err.message : "Update failed",
+        });
+      }
+      return;
+    }
     if (req.method === "DELETE" && memberDeleteMatch) {
       const membershipId = memberDeleteMatch[2];
       try {
