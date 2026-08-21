@@ -814,17 +814,30 @@ export function setCheckIn(
   registrationId: string,
   value: boolean
 ): StoreState {
+  const reg = state.registrations.find((r) => r.id === registrationId);
+  if (!reg) return state;
+
+  const nextRegistrations = state.registrations.map((r) =>
+    r.id === registrationId
+      ? {
+          ...r,
+          checked_in: value,
+          checked_in_at: value ? new Date().toISOString() : undefined,
+        }
+      : r
+  );
+
+  const nextEvents =
+    value && !reg.checked_in
+      ? state.events.map((e) =>
+          e.id === reg.event_id ? { ...e, registered_count: e.registered_count } : e
+        )
+      : state.events;
+
   return {
     ...state,
-    registrations: state.registrations.map((r) =>
-      r.id === registrationId
-        ? {
-            ...r,
-            checked_in: value,
-            checked_in_at: value ? new Date().toISOString() : undefined,
-          }
-        : r
-    ),
+    registrations: nextRegistrations,
+    events: nextEvents,
   };
 }
 
