@@ -123,7 +123,10 @@ function rowToRegistration(row) {
 }
 
 function rowToMembership(row) {
-  return row;
+  return {
+    ...row,
+    permissions: parseJson(row.permissions, undefined),
+  };
 }
 
 function rowToNotification(row) {
@@ -216,7 +219,9 @@ function createSchema(db) {
       club_id TEXT NOT NULL,
       status TEXT NOT NULL,
       applied_at TEXT NOT NULL,
-      role TEXT
+      role TEXT,
+      committee_type TEXT,
+      permissions TEXT
     );
 
     CREATE TABLE IF NOT EXISTS notifications (
@@ -254,7 +259,58 @@ function createSchema(db) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- committee_role_catalog: enforced max per exec role
+    CREATE TABLE IF NOT EXISTS committee_role_catalog (
+      role_name TEXT PRIMARY KEY,
+      max_count INTEGER NOT NULL
+    );
+
+    -- member_permissions: RBAC permission tags per user per club
+    CREATE TABLE IF NOT EXISTS member_permissions (
+      id TEXT PRIMARY KEY,
+      club_id TEXT NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      permission TEXT NOT NULL,
+      scope TEXT NOT NULL DEFAULT 'club',
+      granted_at TEXT NOT NULL,
+      UNIQUE (club_id, user_id, permission)
+    );
+
+    -- event_access: sub-committee member access to specific events
+    CREATE TABLE IF NOT EXISTS event_access (
+      id TEXT PRIMARY KEY,
+      club_id TEXT NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+      event_id TEXT NOT NULL,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL CHECK (role IN ('viewer','manager','organizer')),
+      granted_by TEXT NOT NULL,
+      granted_at TEXT NOT NULL,
+      UNIQUE (club_id, event_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_memberships_club ON memberships(club_id);
+    CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id);
+    CREATE INDEX IF NOT EXISTS idx_memberships_club_role ON memberships(club_id, role);
+    CREATE INDEX IF NOT EXISTS idx_member_permissions_user ON member_permissions(user_id, club_id);
+    CREATE INDEX IF NOT EXISTS idx_event_access_user ON event_access(user_id, club_id);
   `);
+}
+
+function seedRoleCatalog(db) {
+  const roles = [
+    ["President", 1],
+    ["Vice President", 2],
+    ["General Secretary", 1],
+    ["Treasurer", 1],
+    ["Organizing Secretary", 1],
+    ["Event Manager", 999],
+    ["Member", 999],
+  ];
+  const upsert = db.prepare(
+    "INSERT OR IGNORE INTO committee_role_catalog (role_name, max_count) VALUES (?, ?)",
+  );
+  for (const [name, max] of roles) upsert.run(name, max);
 }
 
 function seedIfEmpty(db) {
@@ -277,8 +333,8 @@ function seedIfEmpty(db) {
       VALUES (@id, @user_id, @event_id, @status, @registered_at, @checked_in, @checked_in_at)
     `),
     memberships: db.prepare(`
-      INSERT INTO memberships (id, user_id, club_id, status, applied_at, role)
-      VALUES (@id, @user_id, @club_id, @status, @applied_at, @role)
+      INSERT INTO memberships (id, user_id, club_id, status, applied_at, role, committee_type, permissions)
+      VALUES (@id, @user_id, @club_id, @status, @applied_at, @role, @committee_type, @permissions)
     `),
     notifications: db.prepare(`
       INSERT INTO notifications (id, user_id, type, message, is_read, created_at, event_id, club_id)
@@ -293,7 +349,6 @@ function seedIfEmpty(db) {
   db.exec("BEGIN");
   try {
     if (hasUsers === 0) {
-      for (const user of initialState.users) {
         insert.users.run({
           ...user,
           avatar: user.avatar ?? null,
@@ -331,6 +386,8 @@ function seedIfEmpty(db) {
         insert.memberships.run({
           ...membership,
           role: membership.role ?? null,
+          committee_type: membership.committee_type ?? null,
+          permissions: membership.permissions ? JSON.stringify(membership.permissions) : null,
         });
       }
 
@@ -379,7 +436,10 @@ export function createDatabase() {
   fs.mkdirSync(dataDir, { recursive: true });
   const db = new DatabaseSync(dbPath);
   createSchema(db);
+  migrateSchema(db);
+  seedRoleCatalog(db);
   seedIfEmpty(db);
+  syncAllClubMemberCounts(db);
   return db;
 }
 
@@ -397,6 +457,9 @@ export function writeCurrentUserId(db, userId) {
 }
 
 export function loadSnapshot(db) {
+  // Sync club member_count from actual approved memberships before returning.
+  syncAllClubMemberCounts(db);
+
   const users = db.prepare("SELECT * FROM users ORDER BY id").all().map(rowToUser);
   const clubs = db.prepare("SELECT * FROM clubs ORDER BY id").all();
   const events = db.prepare("SELECT * FROM events ORDER BY id").all().map(rowToEvent);
@@ -475,8 +538,8 @@ export function saveSnapshot(db, snapshot) {
         VALUES (@id, @user_id, @event_id, @status, @registered_at, @checked_in, @checked_in_at)
       `),
       memberships: db.prepare(`
-        INSERT INTO memberships (id, user_id, club_id, status, applied_at, role)
-        VALUES (@id, @user_id, @club_id, @status, @applied_at, @role)
+        INSERT INTO memberships (id, user_id, club_id, status, applied_at, role, committee_type, permissions)
+        VALUES (@id, @user_id, @club_id, @status, @applied_at, @role, @committee_type, @permissions)
       `),
       notifications: db.prepare(`
         INSERT INTO notifications (id, user_id, type, message, is_read, created_at, event_id, club_id)
@@ -525,6 +588,8 @@ export function saveSnapshot(db, snapshot) {
       insert.memberships.run({
         ...membership,
         role: membership.role ?? null,
+        committee_type: membership.committee_type ?? null,
+        permissions: membership.permissions ? JSON.stringify(membership.permissions) : null,
       });
     }
     for (const notification of snapshot.store.notifications) {
@@ -595,4 +660,236 @@ export function createUserRecord(db, payload) {
     sha256(payload.password),
   );
   return id;
+}
+
+// ─── Schema Migration ─────────────────────────────────────────────────────────
+
+/**
+ * Adds columns introduced after the initial schema was deployed.
+ * Safe to re-run — each ALTER TABLE is wrapped in a try/catch.
+ */
+export function migrateSchema(db) {
+  const migrations = [
+    "ALTER TABLE memberships ADD COLUMN committee_type TEXT",
+    "ALTER TABLE memberships ADD COLUMN permissions TEXT",
+  ];
+  for (const sql of migrations) {
+    try {
+      db.exec(sql);
+    } catch {
+      // Column already exists — ignore.
+    }
+  }
+}
+
+// ─── Member CRUD API functions ────────────────────────────────────────────────
+
+/**
+ * Returns all memberships for a club with the joined user record.
+ * member_count on the club is computed from actual approved rows.
+ */
+export function listClubMembers(db, clubId) {
+  const memberships = db
+    .prepare(
+      `SELECT m.*, u.name, u.email, u.student_id, u.department, u.avatar
+       FROM memberships m
+       JOIN users u ON u.id = m.user_id
+       WHERE m.club_id = ?
+       ORDER BY m.applied_at ASC`,
+    )
+    .all(clubId);
+
+  return memberships.map((row) => ({
+    ...row,
+    permissions: parseJson(row.permissions, undefined),
+  }));
+}
+
+/**
+ * Returns the true approved-member count for a club directly from the DB.
+ */
+export function getClubMemberCount(db, clubId) {
+  return db
+    .prepare(
+      "SELECT COUNT(*) AS count FROM memberships WHERE club_id = ? AND status = 'approved'",
+    )
+    .get(clubId).count;
+}
+
+/**
+ * Syncs club.member_count for ALL clubs so the dashboard stat matches the DB.
+ */
+export function syncAllClubMemberCounts(db) {
+  const counts = db
+    .prepare(
+      `SELECT club_id, COUNT(*) AS cnt
+       FROM memberships WHERE status = 'approved'
+       GROUP BY club_id`,
+    )
+    .all();
+
+  const update = db.prepare(
+    "UPDATE clubs SET member_count = ? WHERE id = ?",
+  );
+  db.exec("BEGIN");
+  try {
+    // Reset all to 0 first
+    db.exec("UPDATE clubs SET member_count = 0");
+    for (const row of counts) {
+      update.run(row.cnt, row.club_id);
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+/**
+ * Updates a membership's role and committee_type, enforcing exec role limits.
+ * Throws if the target exec role is already at its maximum for the club.
+ */
+export function updateMembershipRole(db, membershipId, newRole) {
+  const EXEC_ROLE_LIMITS = {
+    President: 1,
+    "Vice President": 2,
+    "General Secretary": 1,
+    Treasurer: 1,
+    "Organizing Secretary": 1,
+  };
+  const EXEC_ROLES = Object.keys(EXEC_ROLE_LIMITS);
+
+  const mem = db
+    .prepare("SELECT * FROM memberships WHERE id = ?")
+    .get(membershipId);
+  if (!mem || mem.status !== "approved") {
+    throw new Error("Membership not found or not approved.");
+  }
+
+  const limit = EXEC_ROLE_LIMITS[newRole];
+  if (limit !== undefined) {
+    const { count } = db
+      .prepare(
+        "SELECT COUNT(*) AS count FROM memberships WHERE club_id = ? AND status = 'approved' AND role = ? AND id != ?",
+      )
+      .get(mem.club_id, newRole, membershipId);
+    if (count >= limit) {
+      throw new Error(
+        `Role "${newRole}" is already at its maximum (${limit}) for this club.`,
+      );
+    }
+  }
+
+  const isExec = EXEC_ROLES.includes(newRole);
+  const committeeType = isExec ? "executive" : "sub_committee";
+  const permissions = isExec
+    ? JSON.stringify(["manage_events", "manage_members", "view_reports"])
+    : newRole === "Event Manager"
+      ? JSON.stringify(["manage_events", "view_reports"])
+      : JSON.stringify(["view_reports"]);
+
+  db.prepare(
+    "UPDATE memberships SET role = ?, committee_type = ?, permissions = ? WHERE id = ?",
+  ).run(newRole, committeeType, permissions, membershipId);
+}
+
+/**
+ * Randomly assigns exec + sub-committee roles to all approved members of
+ * a club, strictly enforcing EXEC_ROLE_LIMITS before filling sub-committee.
+ */
+export function assignRolesForClub(db, clubId) {
+  const EXEC_ROLE_QUEUE = [
+    "President",
+    "Vice President",
+    "Vice President",
+    "General Secretary",
+    "Treasurer",
+    "Organizing Secretary",
+  ];
+
+  const club = db.prepare("SELECT * FROM clubs WHERE id = ?").get(clubId);
+  if (!club) throw new Error("Club not found.");
+
+  const members = db
+    .prepare(
+      "SELECT * FROM memberships WHERE club_id = ? AND status = 'approved' ORDER BY applied_at ASC",
+    )
+    .all(clubId);
+  if (members.length === 0) return;
+
+  // Fisher-Yates shuffle
+  const shuffled = [...members];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Ensure club admin is first so they get President
+  const adminIdx = shuffled.findIndex((m) => m.user_id === club.admin_user_id);
+  if (adminIdx > 0) {
+    const [admin] = shuffled.splice(adminIdx, 1);
+    shuffled.unshift(admin);
+  }
+
+  const EXEC_ROLES = [
+    "President",
+    "Vice President",
+    "General Secretary",
+    "Treasurer",
+    "Organizing Secretary",
+  ];
+
+  const update = db.prepare(
+    "UPDATE memberships SET role = ?, committee_type = ?, permissions = ? WHERE id = ?",
+  );
+
+  db.exec("BEGIN");
+  try {
+    let execIdx = 0;
+    for (const mem of shuffled) {
+      let role, committeeType, permissions;
+      if (execIdx < EXEC_ROLE_QUEUE.length) {
+        role = EXEC_ROLE_QUEUE[execIdx++];
+        committeeType = "executive";
+        permissions = JSON.stringify(["manage_events", "manage_members", "view_reports"]);
+      } else {
+        const isEventManager = shuffled.indexOf(mem) % 2 === 0;
+        role = isEventManager ? "Event Manager" : "Member";
+        committeeType = "sub_committee";
+        permissions = isEventManager
+          ? JSON.stringify(["manage_events", "view_reports"])
+          : JSON.stringify(["view_reports"]);
+      }
+      update.run(role, committeeType, permissions, mem.id);
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+/**
+ * Deletes a single membership record (remove member from club).
+ * Also updates the club's member_count.
+ */
+export function deleteMembership(db, membershipId) {
+  const mem = db
+    .prepare("SELECT * FROM memberships WHERE id = ?")
+    .get(membershipId);
+  if (!mem) throw new Error("Membership not found.");
+
+  db.exec("BEGIN");
+  try {
+    db.prepare("DELETE FROM memberships WHERE id = ?").run(membershipId);
+    if (mem.status === "approved") {
+      db.prepare(
+        "UPDATE clubs SET member_count = MAX(0, member_count - 1) WHERE id = ?",
+      ).run(mem.club_id);
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
 }

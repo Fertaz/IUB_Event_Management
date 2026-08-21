@@ -1220,34 +1220,41 @@ export function reviewMembership(
     club_id: mem.club_id,
   };
 
-  const updatedClubs =
-    action === "approved"
-      ? state.clubs.map((c) =>
-          c.id === mem.club_id ? { ...c, member_count: c.member_count + 1 } : c
-        )
-      : state.clubs;
-
-  return {
+  const withUpdatedMembership: StoreState = {
     ...state,
     memberships: state.memberships.map((m) =>
-      m.id === membershipId ? { ...m, status: action, role: action === "approved" ? "Member" : m.role } : m
+      m.id === membershipId
+        ? {
+            ...m,
+            status: action,
+            role: action === "approved" ? (m.role ?? "Member") : m.role,
+            committee_type:
+              action === "approved"
+                ? ("sub_committee" as CommitteeType)
+                : m.committee_type,
+            permissions:
+              action === "approved" ? (m.permissions ?? ["view_reports"]) : m.permissions,
+          }
+        : m
     ),
-    clubs: updatedClubs,
     notifications: [...state.notifications, userNotif],
   };
+
+  // Re-compute member_count from actual approved records (fixes the sync bug).
+  return syncMemberCounts(withUpdatedMembership);
 }
 
 export function removeMember(state: StoreState, membershipId: string): StoreState {
   const mem = state.memberships.find((m) => m.id === membershipId);
   if (!mem) return state;
 
-  return {
+  const withRemoved: StoreState = {
     ...state,
     memberships: state.memberships.filter((m) => m.id !== membershipId),
-    clubs: state.clubs.map((c) =>
-      c.id === mem.club_id ? { ...c, member_count: Math.max(0, c.member_count - 1) } : c
-    ),
   };
+
+  // Re-compute member_count from actual approved records.
+  return syncMemberCounts(withRemoved);
 }
 
 export function createEvent(state: StoreState, eventData: Omit<Event, "id" | "registered_count" | "waitlisted_count">): StoreState {
