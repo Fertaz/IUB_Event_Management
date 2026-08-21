@@ -1,0 +1,292 @@
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Link,
+  useNavigate,
+  useParams,
+  useLocation,
+} from "react-router";
+
+import { toast, Toaster } from "sonner";
+import { format, parseISO, isPast } from "date-fns";
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Users,
+  Bell,
+  User as UserIcon,
+  Menu,
+  ChevronRight,
+  Search,
+  Plus,
+  Clock,
+  MapPin,
+  Ticket,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  List,
+  UserCheck,
+  Settings,
+  Trash2,
+  Edit3,
+  BookOpen,
+  Shield,
+  UserCog,
+  BadgeCheck,
+  Hourglass,
+  ChevronDown,
+  ArrowLeft,
+  Globe,
+  CalendarCheck,
+  Share2,
+  CalendarPlus,
+  Download,
+  Repeat,
+  MailCheck,
+} from "lucide-react";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Badge } from "./ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "./ui/tabs";
+import {
+  Avatar,
+  AvatarFallback,
+} from "./ui/avatar";
+import { Separator } from "./ui/separator";
+import { Textarea } from "./ui/textarea";
+import { Label } from "./ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "./ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
+import {
+  downloadICS,
+  googleCalendarUrl,
+  shareEvent,
+  checkInCode,
+  parseCheckInCode,
+  getOccurrences,
+  recurrenceLabel,
+  formatEventTime,
+} from "../lib/eventUtils";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
+import type {
+  StoreState,
+  User,
+  UserRole,
+  ClubRole,
+  Club,
+  Event,
+  Notification,
+  RoleRequest,
+} from "../lib/store";
+import {
+  initialState,
+  registerForEvent,
+  cancelRegistration,
+  applyToClub,
+  reviewMembership,
+  removeMember,
+  assignClubRoles,
+  updateMemberRole,
+  createEvent,
+  updateEvent,
+  cancelEvent,
+  deleteEventAdmin,
+  deleteClubAdmin,
+  markNotificationsRead,
+  updateProfile,
+  registerUser,
+  submitRoleRequest,
+  reviewRoleRequest,
+  changeUserRole,
+  seedCounters,
+  setCheckIn,
+  toggleEventException,
+  sendDigest,
+} from "../lib/store";
+import { authService } from "../services/authService";
+import {
+  fetchAppState,
+  persistAppState,
+} from "../services/stateService";
+import {
+  fetchClubMembers,
+  assignRoles as assignClubRolesApi,
+  updateMemberRole as updateMemberRoleApi,
+  deleteMember as deleteMemberApi,
+  addMember as addMemberApi,
+  updateMemberDetails as updateMemberDetailsApi,
+  type GetClubMembersResponse,
+  type MemberSummary,
+} from "../services/memberService";
+import { useAuth } from "../context/AuthContext";
+import { useData } from "../context/DataContext";
+import { CapacityBar } from "./CapacityBar";
+
+export function EventCard({ event }: { event: Event }) {
+  const { store } = useData();
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const club = store.clubs.find((c) => c.id === event.club_id);
+  const myReg = store.registrations.find(
+    (r) =>
+      r.user_id === currentUser?.id && r.event_id === event.id,
+  );
+  const isFull = event.registered_count >= event.capacity;
+
+  return (
+    <Card
+      className="group overflow-hidden flex flex-col cursor-pointer hover:shadow-md transition-all duration-200 border-border"
+      onClick={() => navigate(`/events/${event.id}`)}
+    >
+      <div className="relative h-44 overflow-hidden bg-muted">
+        <ImageWithFallback
+          src={event.poster_url}
+          alt={event.title}
+          className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+        />
+        <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
+          {event.tags.slice(0, 2).map((tag) => (
+            <span
+              key={tag}
+              className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-black/50 text-white backdrop-blur-sm"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+        {myReg && (
+          <div className="absolute top-3 right-3">
+            <span
+              className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded ${
+                myReg.status === "registered"
+                  ? "bg-quaternary text-foreground"
+                  : "bg-accent text-foreground"
+              }`}
+            >
+              {myReg.status === "registered"
+                ? "Registered"
+                : "Waitlisted"}
+            </span>
+          </div>
+        )}
+        {event.status === "cancelled" && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <span className="text-white font-semibold text-sm">
+              Cancelled
+            </span>
+          </div>
+        )}
+        {isFull && !myReg && event.status !== "cancelled" && (
+          <div className="absolute bottom-3 right-3">
+            <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-destructive/90 text-white">
+              Full
+            </span>
+          </div>
+        )}
+      </div>
+
+      <CardHeader className="pb-2 pt-4">
+        <CardTitle className="text-base leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+          {event.title}
+        </CardTitle>
+        <CardDescription className="text-xs font-mono text-muted-foreground">
+          {club?.short_name ?? club?.name}
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="pb-3 flex-1 space-y-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <CalendarDays className="size-3 shrink-0" />
+          <span>
+            {format(parseISO(event.date), "d MMM yyyy")}
+          </span>
+          <span>·</span>
+          <Clock className="size-3 shrink-0" />
+          <span>{formatEventTime(event.start_time)}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <MapPin className="size-3 shrink-0" />
+          <span className="line-clamp-1">{event.venue}</span>
+        </div>
+      </CardContent>
+
+      <CardFooter className="pt-0 pb-4">
+        <CapacityBar
+          registered={event.registered_count}
+          capacity={event.capacity}
+        />
+      </CardFooter>
+    </Card>
+  );
+}
+
