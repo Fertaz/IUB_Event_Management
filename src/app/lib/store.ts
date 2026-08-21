@@ -1148,17 +1148,9 @@ export function setCheckIn(
       : r
   );
 
-  const nextEvents =
-    value && !reg.checked_in
-      ? state.events.map((e) =>
-          e.id === reg.event_id ? { ...e, registered_count: e.registered_count } : e
-        )
-      : state.events;
-
   return {
     ...state,
     registrations: nextRegistrations,
-    events: nextEvents,
   };
 }
 
