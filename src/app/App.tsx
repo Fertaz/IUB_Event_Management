@@ -188,6 +188,32 @@ function createEmptyStore(): StoreState {
   };
 }
 
+function cloneStore(state: StoreState): StoreState {
+  return {
+    ...state,
+    users: state.users.map((u) => ({ ...u })),
+    clubs: state.clubs.map((c) => ({ ...c })),
+    events: state.events.map((e) => ({
+      ...e,
+      tags: [...e.tags],
+      exception_dates: e.exception_dates
+        ? [...e.exception_dates]
+        : undefined,
+    })),
+    registrations: state.registrations.map((r) => ({ ...r })),
+    memberships: state.memberships.map((m) => ({ ...m })),
+    notifications: state.notifications.map((n) => ({ ...n })),
+    roleRequests: state.roleRequests.map((r) => ({ ...r })),
+  };
+}
+
+function createDemoStore(): StoreState {
+  const next = cloneStore(initialState);
+  next.currentUserId = "";
+  seedCounters(next);
+  return next;
+}
+
 // ─── Auth Context ─────────────────────────────────────────────────────────────
 
 interface AuthContextValue {
@@ -280,6 +306,8 @@ function Providers({
     string | null
   >(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isBackendAvailable, setIsBackendAvailable] =
+    useState(true);
 
   const currentUser =
     store.users.find((u) => u.id === currentUserId) ?? null;
@@ -294,11 +322,17 @@ function Providers({
         seedCounters(snapshot.store);
         setStore(snapshot.store);
         setCurrentUserId(snapshot.currentUserId);
+        setIsBackendAvailable(true);
       } catch (error) {
         console.error("Failed to load backend state.", error);
-        toast.error("Could not load backend state", {
+        const demoStore = createDemoStore();
+        if (cancelled) return;
+        setStore(demoStore);
+        setCurrentUserId(null);
+        setIsBackendAvailable(false);
+        toast.info("Backend unavailable — demo mode enabled", {
           description:
-            "Check VITE_API_BASE_URL and backend availability.",
+            "Using local seeded demo data for login and browsing.",
         });
       } finally {
         if (!cancelled) setIsBootstrapping(false);
@@ -313,7 +347,7 @@ function Providers({
   }, []);
 
   useEffect(() => {
-    if (isBootstrapping) return;
+    if (isBootstrapping || !isBackendAvailable) return;
     void persistAppState({ store, currentUserId }).catch((error) => {
       console.error("Failed to persist backend state.", error);
       toast.error("Failed to sync changes", {
@@ -321,15 +355,30 @@ function Providers({
           "Your latest updates were not saved to the backend.",
       });
     });
-  }, [store, currentUserId, isBootstrapping]);
+  }, [
+    store,
+    currentUserId,
+    isBootstrapping,
+    isBackendAvailable,
+  ]);
 
   const login = useCallback(
     async (email: string, password: string) => {
       const userId = await authService.login({ email, password });
-      const snapshot = await fetchAppState();
-      seedCounters(snapshot.store);
-      setStore(snapshot.store);
-      setCurrentUserId(userId);
+      try {
+        const snapshot = await fetchAppState();
+        seedCounters(snapshot.store);
+        setStore(snapshot.store);
+        setCurrentUserId(userId);
+        setIsBackendAvailable(true);
+      } catch (error) {
+        console.error("Backend state unavailable after login.", error);
+        const demoStore = createDemoStore();
+        demoStore.currentUserId = userId;
+        setStore(demoStore);
+        setCurrentUserId(userId);
+        setIsBackendAvailable(false);
+      }
     },
     [],
   );

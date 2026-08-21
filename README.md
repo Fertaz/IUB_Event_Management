@@ -5,11 +5,7 @@ This is the code repository for the IUB Campus Hub web application, designed to 
 
 ## Backend configuration
 
-This app now loads and persists app state through a backend API instead of local mock persistence.
-
-Set the API base URL by defining `window.__API_BASE_URL__` before the app loads (for example in your hosting template):
-
-`<script>window.__API_BASE_URL__ = "https://your-backend.example.com/api";</script>`
+This app now runs against a local SQLite-backed API in development.
 
 Expected endpoints:
 
@@ -19,9 +15,15 @@ Expected endpoints:
 - `GET /state`
 - `PUT /state`
 
-  ## Running the code
+## Running the code
 
-  Run `npm i` to install the dependencies.
+Run `npm i` to install the dependencies.
 
-  Run `npm run dev` to start the development server.
+Run `npm run dev` to start both the backend API and the Vite client.
+
+Demo logins:
+
+- `admin@iub.edu.bd` / `Admin@12345`
+- `shoikat.azad@iub.edu.bd` / `Club@12345`
+- `anika.rahman@iub.edu.bd` / `Student@12345`
   
