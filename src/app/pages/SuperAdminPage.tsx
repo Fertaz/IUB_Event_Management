@@ -595,6 +595,9 @@ export function SuperAdminPage() {
                             <SelectItem value="student">
                               Student
                             </SelectItem>
+                            <SelectItem value="coordinator">
+                              Co-ordinator
+                            </SelectItem>
                             <SelectItem value="club_admin">
                               Club Admin
                             </SelectItem>

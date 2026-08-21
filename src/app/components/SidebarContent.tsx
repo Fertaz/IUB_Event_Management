@@ -3,7 +3,7 @@ import {
   LayoutDashboard,
   CalendarDays,
   Users, UserCheck, BookOpen,
-  Shield, BadgeCheck, Globe
+  Shield, Globe
 } from "lucide-react";
 import {
   Avatar,
@@ -15,7 +15,7 @@ import { useData } from "../context/DataContext";
 import { NavLink } from "./NavLink";
 
 export function SidebarContent({ onClose }: { onClose?: () => void }) {
-  const { currentUser, isStudent, isClubAdmin, isSuperAdmin } =
+  const { currentUser, isStudent, isCoordinator, isClubAdmin, isSuperAdmin } =
     useAuth();
   const { store } = useData();
 
@@ -24,6 +24,12 @@ export function SidebarContent({ onClose }: { onClose?: () => void }) {
         (c) => c.admin_user_id === currentUser?.id,
       )
     : null;
+
+  const coordinatorClubs = isCoordinator
+    ? store.clubs.filter((c) =>
+        (c.coordinator_ids ?? []).includes(currentUser?.id ?? ""),
+      )
+    : [];
 
   const pendingRequests = myClub
     ? store.memberships.filter(
@@ -54,7 +60,7 @@ export function SidebarContent({ onClose }: { onClose?: () => void }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {!isSuperAdmin && (
+        {isStudent && (
           <NavLink
             to="/dashboard"
             icon={LayoutDashboard}
@@ -74,13 +80,26 @@ export function SidebarContent({ onClose }: { onClose?: () => void }) {
           label="Clubs"
           onClick={onClose}
         />
-        {isStudent && (
-          <NavLink
-            to="/request-role"
-            icon={BadgeCheck}
-            label="Become an Organizer"
-            onClick={onClose}
-          />
+        {isCoordinator && coordinatorClubs.length > 0 && (
+          <>
+            <div className="pt-4 pb-1 px-3">
+              <p className="text-[10px] font-mono font-medium text-sidebar-foreground/40 uppercase tracking-wider">
+                Co-ordinator
+              </p>
+            </div>
+            <NavLink
+              to="/coordinator"
+              icon={LayoutDashboard}
+              label="Dashboard"
+              onClick={onClose}
+            />
+            <NavLink
+              to="/admin/events"
+              icon={CalendarDays}
+              label="Manage Events"
+              onClick={onClose}
+            />
+          </>
         )}
         {isClubAdmin && myClub && (
           <>

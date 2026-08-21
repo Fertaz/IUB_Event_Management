@@ -1,156 +1,102 @@
-# IUB Event & Club Management
+# IUB Event & Club Management System
 
-A modern campus engagement platform built for students, clubs, and administrators at IUB. The app brings together event discovery, club membership management, role-based administration, and activity tracking in a single clean experience.
+A web-based role-driven platform for Independent University, Bangladesh (IUB) to manage student clubs, events, registrations, and administrative workflows in one place.
 
-**Live app:** https://iub-event-management.web.app
+**Live website:** https://iub-event-management.web.app
 
-## Project overview
+## What this application does
 
-IUB Event & Club Management is designed to help a university community:
+This system supports the full campus activity flow:
 
-- discover upcoming events and activities
-- browse student clubs and their member directories
-- join clubs and track membership requests
-- manage event attendance and check-in flows
-- support club admins with dashboards and reporting
-- give super admins visibility into the wider campus ecosystem
+1. Students discover clubs and events.
+2. Students submit club applications and event registration forms.
+3. Coordinators manage event operations.
+4. Club Admins manage club-level members and approvals.
+5. Super Admins oversee the full platform and role assignments.
 
-The project pairs a polished React frontend with **Firebase** (Firestore, Authentication, and Hosting) as the backend, so it runs as a real, deployable student platform.
+## Role architecture
 
-## Why this project matters
+The app has **4 roles** with strict access control:
 
-Campus life is fragmented across groups, announcements, clubs, and events. This system centralizes those touchpoints into a cohesive experience where students can engage, clubs can organize, and administrators can oversee participation without juggling multiple tools.
+1. **Student**
+   - Can browse clubs/events.
+   - Can submit club and event forms.
+   - Cannot access admin pages.
+   - Cannot view other students' personal details.
+2. **Coordinator**
+   - Manages events for assigned clubs (create/edit events, roster/check-in related flows).
+   - Cannot manage club members or role approvals.
+3. **Club Admin**
+   - Full club operations: events + membership requests + member roster.
+4. **Super Admin**
+   - System-level oversight and user role management.
 
-## Core features
+## Key faculty-facing features
 
-### Student experience
-- personalized dashboard with campus activity overview
-- event feed with detail pages and RSVP-like interactions
-- club directory and club detail pages
-- member count and roster visibility
-- profile and notification center
-- join-request flow for club membership
+- **Role-Based Access Control (RBAC):** users only see and access pages relevant to their role.
+- **Separate dashboards:** dedicated dashboard experience for Student, Coordinator, and Club Admin workflows.
+- **Student privacy controls:** student view hides other students' personal information.
+- **Club Application Form:** students apply before joining a club (no instant join).
+- **Event Registration Form:** students submit contact details before event registration.
+- **Seat-capacity enforcement:** when seats are full, registration is blocked and UI shows **"Seats are full"**.
+- **Notification and profile support:** users receive in-app updates and maintain profile information.
 
-### Club/admin experience
-- club admin dashboard
-- event creation and editing
-- attendee roster management
-- membership request approvals and rejection flows
-- member roster tracking
+## Technology and backend
 
-### Super admin experience
-- central oversight of roles and platform operations
-- higher-level controls for administrative workflows
+- **Frontend:** React + TypeScript + Vite
+- **UI:** Tailwind CSS + Radix UI + Lucide icons
+- **Backend platform:** Firebase
+  - Firestore (state persistence)
+  - Firebase Authentication (email/password)
+  - Firebase Hosting (deployment)
 
-### Technical experience
-- role-protected routes
-- loading states and toast feedback
-- clean modular frontend structure
-- Firebase Auth + Firestore persistence
-- modern UI with Tailwind + Radix primitives
+## Data and authentication model
 
-## Tech stack
+- Authentication is restricted to `@iub.edu.bd` emails.
+- Signed-in identity is mapped to a user record with role metadata.
+- App state is persisted in Firestore document `appState/main`.
+- Firestore rules enforce write access for authenticated institutional users.
+- If Firebase config is missing, the app falls back to local **demo mode** for testing.
 
-- Frontend: React, TypeScript, Vite
-- Routing: React Router
-- UI: Tailwind CSS, Radix UI, Lucide icons, motion
-- State + app structure: context providers and modular app architecture
-- Backend: Firebase — **Firestore** (data), **Firebase Authentication** (email/password), **Firebase Hosting** (deploy)
+## Demo mode credentials
 
-## Data & auth model
+When running without Firebase configuration:
 
-- The whole application state is stored as a single Firestore document `appState/main`
-  (a snapshot of the app store: users, clubs, events, registrations, memberships,
-  notifications, and role requests).
-- Authentication uses **Firebase Auth** with email/password. Sign-up is restricted
-  to `@iub.edu.bd` addresses. The signed-in email is matched to a user record in
-  the store to resolve the current user and their role.
-- Security rules live in `firestore.rules`: reads are public (for browsing),
-  writes require an authenticated `@iub.edu.bd` user.
-- **Demo mode:** if no Firebase config is present (see below), the app falls back to
-  a local seeded demo store with no persistence, so it still runs offline.
-
-## Repository structure
-
-- `src/app/` — frontend app, pages, components, context, utilities
-- `src/app/lib/firebase.ts` — Firebase initialization
-- `src/app/services/` — auth, state (Firestore), and member service layers
-- `firebase.json`, `.firebaserc` — Firebase Hosting + project config
-- `firestore.rules`, `firestore.indexes.json` — Firestore security rules and indexes
-- `public/` — static assets
-
-## Getting started
-
-### 1) Install dependencies
-
-```bash
-npm install
-```
-
-### 2) Configure Firebase
-
-Copy `.env.example` to `.env` and fill in your Firebase web app config
-(Firebase console → Project settings → Your apps → Web app → SDK config):
-
-```
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-```
-
-> `.env` is gitignored. These `VITE_*` values are safe to ship in the client bundle —
-> Firebase security is enforced by Auth + Firestore rules, not by hiding them.
-> If `.env` is omitted, the app runs in local demo mode.
-
-Enable **Email/Password** sign-in and create a **Firestore** database (default) in the
-Firebase console before first use.
-
-### 3) Run in development
-
-```bash
-npm run dev
-```
-
-### 4) Build for production
-
-```bash
-npm run build
-```
-
-## Deployment
-
-Deploy Firestore rules and the built site to Firebase Hosting:
-
-```bash
-npm run deploy
-```
-
-> PowerShell blocks `npm`/`npx`/`firebase` `.ps1` shims by execution policy. If affected,
-> invoke the tools via their Node entry points instead:
->
-> ```powershell
-> node .\node_modules\vite\bin\vite.js build
-> node .\node_modules\firebase-tools\lib\bin\firebase.js deploy --project iub-event-management
-> ```
-
-## First run
-
-Open the app and **register** with an `@iub.edu.bd` email. The first sign-up creates the
-Firebase Auth account and seeds Firestore with the app data. To grant yourself super-admin,
-edit that user's `role` to `super_admin` in the Firestore console
-(`appState/main` → `store.users`).
-
-## Demo accounts
-
-When running in **demo mode** (no Firebase config), these seeded users are available:
-
-- Admin: `admin@iub.edu.bd` / `Admin@12345`
-- Club admin: `shoikat.azad@iub.edu.bd` / `Club@12345`
+- Super Admin: `admin@iub.edu.bd` / `Admin@12345`
+- Club Admin: `shoikat.azad@iub.edu.bd` / `Club@12345`
+- Coordinator: `coordinator@iub.edu.bd` / `Coord@12345`
 - Student: `anika.rahman@iub.edu.bd` / `Student@12345`
 
-## License
+## Local setup
 
-This project is for educational/demo purposes.
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Create `.env` from `.env.example` and add `VITE_FIREBASE_*` values.
+3. Run development server:
+   ```bash
+   npm run dev
+   ```
+
+## Build and deploy
+
+PowerShell on Windows may block `.ps1` shims (`npm`/`npx`/`firebase`). Use Node entry points:
+
+```powershell
+node .\node_modules\typescript\bin\tsc --noEmit
+node .\node_modules\vite\bin\vite.js build
+node .\node_modules\firebase-tools\lib\bin\firebase.js deploy --project iub-event-management
+```
+
+## Repository structure (quick map)
+
+- `src/app/pages/` - role dashboards and feature pages
+- `src/app/components/` - reusable UI and layout
+- `src/app/context/` - auth and data providers
+- `src/app/lib/` - store logic, role rules, helpers
+- `src/app/services/` - Firebase-backed auth/state services
+
+## Educational use
+
+This project is built for academic and demonstration purposes.

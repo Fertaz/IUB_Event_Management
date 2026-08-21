@@ -15,7 +15,6 @@ import {
 } from "./ui/sheet";
 import { useAuth } from "../context/AuthContext";
 import { NotificationBell } from "./NotificationBell";
-import { RoleSwitcher } from "./RoleSwitcher";
 import { SidebarContent } from "./SidebarContent";
 import { TopBarUserMenu } from "./TopBarUserMenu";
 
@@ -60,7 +59,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Button>
           <div className="flex-1" />
           <div className="flex items-center gap-2">
-            <RoleSwitcher />
             <NotificationBell />
             <TopBarUserMenu />
           </div>

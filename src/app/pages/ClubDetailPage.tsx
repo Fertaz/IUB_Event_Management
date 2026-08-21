@@ -23,8 +23,8 @@ import { EmptyState } from "../components/EmptyState";
 
 export function ClubDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { store, doApplyClub } = useData();
-  const { currentUser } = useAuth();
+  const { store } = useData();
+  const { currentUser, isStudent } = useAuth();
   const navigate = useNavigate();
 
   const club = store.clubs.find((c) => c.id === id);
@@ -140,32 +140,44 @@ export function ClubDetailPage() {
                 >
                   Members
                 </h2>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {clubMembers
-                    .slice(0, 6)
-                    .map(({ user, role }) =>
-                      user ? (
-                        <div
-                          key={user.id}
-                          className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg"
-                        >
-                          <Avatar className="size-8">
-                            <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-                              {getInitials(user.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">
-                              {user.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground font-mono">
-                              {role ?? "Member"}
-                            </p>
+                {isStudent ? (
+                  <p className="text-sm text-muted-foreground">
+                    This club has{" "}
+                    <span className="font-semibold text-foreground">
+                      {clubMembers.length}
+                    </span>{" "}
+                    active member
+                    {clubMembers.length !== 1 ? "s" : ""}. Member
+                    details are private.
+                  </p>
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {clubMembers
+                      .slice(0, 6)
+                      .map(({ user, role }) =>
+                        user ? (
+                          <div
+                            key={user.id}
+                            className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg"
+                          >
+                            <Avatar className="size-8">
+                              <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                                {getInitials(user.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="text-sm font-medium">
+                                {user.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground font-mono">
+                                {role ?? "Member"}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ) : null,
-                    )}
-                </div>
+                        ) : null,
+                      )}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -209,7 +221,7 @@ export function ClubDetailPage() {
                 </p>
                 <Button
                   className="w-full bg-primary hover:bg-primary/90"
-                  onClick={() => doApplyClub(club.id)}
+                  onClick={() => navigate(`/clubs/${club.id}/apply`)}
                 >
                   Apply to Join
                 </Button>

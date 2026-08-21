@@ -198,25 +198,32 @@ export function Providers({
   }, []);
 
   const doRegister = useCallback(
-    (eventId: string) => {
+    (
+      eventId: string,
+      contact?: {
+        full_name?: string;
+        contact_email?: string;
+        phone?: string;
+      },
+    ) => {
       setStore((s) => {
         const event = s.events.find((e) => e.id === eventId)!;
         const isFull = event.registered_count >= event.capacity;
+        if (isFull) {
+          toast.error("Seats are full", {
+            description: `"${event.title}" has no available seats.`,
+          });
+          return s;
+        }
         const next = registerForEvent(
           s,
           currentUserId ?? "",
           eventId,
+          contact,
         );
-        toast.success(
-          isFull
-            ? "Added to waitlist"
-            : "Registered successfully!",
-          {
-            description: isFull
-              ? `You joined the waitlist for "${event.title}".`
-              : `See you at "${event.title}"!`,
-          },
-        );
+        toast.success("Registered successfully!", {
+          description: `See you at "${event.title}"!`,
+        });
         return next;
       });
     },
@@ -242,13 +249,21 @@ export function Providers({
   );
 
   const doApplyClub = useCallback(
-    (clubId: string) => {
+    (
+      clubId: string,
+      application?: {
+        contact_email?: string;
+        phone?: string;
+        motivation?: string;
+      },
+    ) => {
       setStore((s) => {
         const club = s.clubs.find((c) => c.id === clubId)!;
         const next = applyToClub(
           s,
           currentUserId ?? "",
           clubId,
+          application,
         );
         toast.success("Application submitted", {
           description: `Your request to join ${club.name} has been sent.`,
@@ -499,6 +514,7 @@ export function Providers({
     switchRole,
     logout,
     isStudent: currentUser?.role === "student",
+    isCoordinator: currentUser?.role === "coordinator",
     isClubAdmin: currentUser?.role === "club_admin",
     isSuperAdmin: currentUser?.role === "super_admin",
   };

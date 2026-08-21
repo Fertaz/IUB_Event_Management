@@ -14,13 +14,32 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { useAuth } from "../context/AuthContext";
+import { roleHome } from "../context/AuthContext";
 import { AuthBrandPanel } from "../components/AuthBrandPanel";
 import { GoogleIcon } from "../components/GoogleIcon";
 import { ComicButton } from "../components/ComicButton";
 
+const DEMO_ACCOUNTS = [
+  {
+    label: "Student",
+    email: "anika.rahman@iub.edu.bd",
+    password: "Student@12345",
+  },
+  {
+    label: "Co-ordinator",
+    email: "coordinator@iub.edu.bd",
+    password: "Coord@12345",
+  },
+  {
+    label: "Club Admin",
+    email: "shoikat.azad@iub.edu.bd",
+    password: "Club@12345",
+  },
+];
+
 export function LoginPage() {
 
-  const { login } = useAuth();
+  const { login, currentUser } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,7 +57,6 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(normalizedEmail, password);
-      navigate("/dashboard");
     } catch (error) {
       console.error("Login failed.", error);
       toast.error("Login failed", {
@@ -49,6 +67,13 @@ export function LoginPage() {
       setIsSubmitting(false);
     }
   }
+
+  // Redirect to the role-appropriate home once the session resolves.
+  React.useEffect(() => {
+    if (currentUser) {
+      navigate(roleHome(currentUser.role), { replace: true });
+    }
+  }, [currentUser, navigate]);
 
   return (
     <div className="min-h-screen flex items-stretch">
@@ -135,6 +160,29 @@ export function LoginPage() {
             <GoogleIcon className="size-4" />
             Continue with Google (Coming soon)
           </Button>
+
+          <div className="mt-6 rounded-lg border border-border bg-muted/40 p-3">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono mb-2">
+              Demo accounts
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {DEMO_ACCOUNTS.map((acc) => (
+                <Button
+                  key={acc.email}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => {
+                    setEmail(acc.email);
+                    setPassword(acc.password);
+                  }}
+                >
+                  {acc.label}
+                </Button>
+              ))}
+            </div>
+          </div>
 
           <p className="text-sm text-center text-muted-foreground mt-6">
             {"Don't have an account? "}

@@ -29,6 +29,7 @@ export function capacityColor(pct: number) {
 export function roleBadge(role: string) {
   const map: Record<string, string> = {
     student: "bg-secondary text-secondary-foreground",
+    coordinator: "bg-quaternary/15 text-quaternary",
     club_admin: "bg-accent/15 text-accent",
     super_admin: "bg-primary/15 text-primary",
   };

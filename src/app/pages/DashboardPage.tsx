@@ -2,45 +2,57 @@ import {
   Navigate, useNavigate
 } from "react-router";
 
-import { format, parseISO, isPast } from "date-fns";
+import { parseISO, isPast } from "date-fns";
 import {
   CalendarDays,
   Users,
-  Bell, ChevronRight, Hourglass, CalendarCheck, MailCheck
+  Bell, ChevronRight, CalendarCheck, MailCheck, Sparkles
 } from "lucide-react";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import {
-  formatEventTime
-} from "../lib/eventUtils";
 import type {
   Club,
   Event
 } from "../lib/store";
 import { useAuth } from "../context/AuthContext";
+import { roleHome } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { EventCard } from "../components/EventCard";
 import { ClubCard } from "../components/ClubCard";
 import { StatCard } from "../components/StatCard";
 import { EmptyState } from "../components/EmptyState";
 
+const NEW_FEATURES = [
+  {
+    title: "Application & registration forms",
+    description:
+      "Joining a club or registering for an event now uses a quick form so organisers can reach you.",
+  },
+  {
+    title: "Live seat availability",
+    description:
+      "Event pages show real-time seats. Registration closes automatically once an event is full.",
+  },
+  {
+    title: "Personalised dashboards",
+    description:
+      "Your dashboard now highlights only what's relevant to you as a student.",
+  },
+];
+
 export function DashboardPage() {
   const { store, doSendDigest } = useData();
-  const { currentUser, isSuperAdmin } = useAuth();
+  const { currentUser, isStudent } = useAuth();
   const navigate = useNavigate();
 
-  // Super admins have no student dashboard — the Admin Console is their home.
-  if (isSuperAdmin)
-    return <Navigate to="/superadmin" replace />;
+  // Non-students have their own home (coordinator / admin / super admin).
+  if (currentUser && !isStudent)
+    return <Navigate to={roleHome(currentUser.role)} replace />;
 
   const myRegs = store.registrations.filter(
     (r) => r.user_id === currentUser?.id,
   );
   const myRegistered = myRegs.filter(
     (r) => r.status === "registered",
-  );
-  const myWaitlisted = myRegs.filter(
-    (r) => r.status === "waitlisted",
   );
 
   const upcomingEvents = myRegistered
@@ -102,12 +114,6 @@ export function DashboardPage() {
           sub="upcoming events"
         />
         <StatCard
-          icon={Hourglass}
-          label="Waitlisted"
-          value={myWaitlisted.length}
-          color="accent"
-        />
-        <StatCard
           icon={Users}
           label="Clubs Joined"
           value={myClubs.length}
@@ -165,50 +171,32 @@ export function DashboardPage() {
         )}
       </div>
 
-      {myWaitlisted.length > 0 && (
-        <div>
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="size-5 text-primary" />
           <h2
             style={{ fontFamily: "'Outfit', sans-serif" }}
-            className="text-lg font-semibold mb-4"
+            className="text-lg font-semibold"
           >
-            Waitlisted Events
+            New Features
           </h2>
-          <div className="space-y-2">
-            {myWaitlisted.map((r) => {
-              const event = store.events.find(
-                (e) => e.id === r.event_id,
-              );
-              if (!event) return null;
-              return (
-                <div
-                  key={r.id}
-                  onClick={() =>
-                    navigate(`/events/${event.id}`)
-                  }
-                  className="flex items-center gap-4 p-3 bg-card border border-border rounded-lg hover:border-primary/30 cursor-pointer transition-colors"
-                >
-                  <Hourglass className="size-4 text-accent shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium line-clamp-1">
-                      {event.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {format(parseISO(event.date), "d MMM")} ·{" "}
-                      {formatEventTime(event.start_time)}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-foreground border-accent/50 bg-accent/10 text-[10px] font-mono shrink-0"
-                  >
-                    Waitlisted
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
         </div>
-      )}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {NEW_FEATURES.map((f) => (
+            <div
+              key={f.title}
+              className="p-4 bg-card border border-border rounded-lg"
+            >
+              <p className="text-sm font-semibold mb-1">
+                {f.title}
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {f.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div>
         <div className="flex items-center justify-between mb-4">

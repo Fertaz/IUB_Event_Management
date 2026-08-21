@@ -51,7 +51,7 @@ import { EmptyState } from "../components/EmptyState";
 
 export function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { store, doRegister, doCancel, doToggleException } =
+  const { store, doCancel, doToggleException } =
     useData();
   const { currentUser, isClubAdmin } = useAuth();
   const navigate = useNavigate();
@@ -417,22 +417,17 @@ export function EventDetailPage() {
               </div>
             ) : isFull ? (
               <div className="space-y-3">
-                <div className="rounded-md bg-accent/10 border border-accent/30 p-3 text-xs text-foreground text-center">
-                  This event is full. Join the waitlist and
-                  you'll be notified if a spot opens.
+                <div className="rounded-md bg-destructive/8 border border-destructive/25 p-3 text-sm text-destructive text-center font-semibold flex items-center justify-center gap-1.5">
+                  <AlertCircle className="size-4" /> Seats are full
                 </div>
-                <Button
-                  className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
-                  onClick={() => doRegister(event.id)}
-                >
-                  <Hourglass className="size-4 mr-2" /> Join
-                  Waitlist
+                <Button className="w-full" disabled>
+                  Registration Closed
                 </Button>
               </div>
             ) : (
               <Button
                 className="w-full bg-primary hover:bg-primary/90"
-                onClick={() => doRegister(event.id)}
+                onClick={() => navigate(`/events/${event.id}/register`)}
               >
                 <Ticket className="size-4 mr-2" /> Register Now
               </Button>

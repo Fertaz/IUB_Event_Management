@@ -1,7 +1,21 @@
 import { createContext, useContext } from "react";
-import type { User } from "../lib/store";
+import type { User, UserRole } from "../lib/store";
 
 // ─── Auth Context ─────────────────────────────────────────────────────────────
+
+/** Landing route for a role right after login / when hitting "/dashboard". */
+export function roleHome(role: UserRole | undefined): string {
+  switch (role) {
+    case "super_admin":
+      return "/superadmin";
+    case "club_admin":
+      return "/admin/dashboard";
+    case "coordinator":
+      return "/coordinator";
+    default:
+      return "/dashboard";
+  }
+}
 
 export interface AuthContextValue {
   currentUser: User | null;
@@ -16,6 +30,7 @@ export interface AuthContextValue {
   switchRole: (userId: string) => void;
   logout: () => void;
   isStudent: boolean;
+  isCoordinator: boolean;
   isClubAdmin: boolean;
   isSuperAdmin: boolean;
 }

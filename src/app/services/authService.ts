@@ -38,6 +38,7 @@ export interface RegisterPayload {
 const DEMO_CREDENTIALS: Record<string, string> = {
   "admin@iub.edu.bd": "Admin@12345",
   "shoikat.azad@iub.edu.bd": "Club@12345",
+  "coordinator@iub.edu.bd": "Coord@12345",
   "anika.rahman@iub.edu.bd": "Student@12345",
 };
 

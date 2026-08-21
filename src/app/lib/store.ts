@@ -1,6 +1,10 @@
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type UserRole = "student" | "club_admin" | "super_admin";
+export type UserRole =
+  | "student"
+  | "coordinator"
+  | "club_admin"
+  | "super_admin";
 
 /**
  * Executive Committee roles with strict per-club limits enforced by
@@ -48,6 +52,8 @@ export interface Club {
   description: string;
   category: string;
   admin_user_id: string;
+  /** User ids of coordinators who manage this club's events. */
+  coordinator_ids?: string[];
   member_count: number;
   cover_url: string;
   founded: string;
@@ -86,6 +92,10 @@ export interface Registration {
   registered_at: string;
   checked_in?: boolean;
   checked_in_at?: string;
+  /** Contact info captured by the Event Registration Form. */
+  full_name?: string;
+  contact_email?: string;
+  phone?: string;
 }
 
 export interface Membership {
@@ -94,6 +104,10 @@ export interface Membership {
   club_id: string;
   status: "pending" | "approved" | "rejected";
   applied_at: string;
+  /** Contact details captured by the Club Application Form. */
+  contact_email?: string;
+  phone?: string;
+  motivation?: string;
   /** Club-level role (e.g. "President", "Member"). */
   role?: string;
   /**
@@ -217,6 +231,15 @@ const CORE_USERS: User[] = [
     department: "BBA",
     role: "student",
   },
+  {
+    id: "user_9",
+    email: "coordinator@iub.edu.bd",
+    name: "Rifat Chowdhury",
+    student_id: "2320777",
+    department: "CSE",
+    role: "coordinator",
+    bio: "Event Coordinator for IUB Computer Science Society.",
+  },
 ];
 
 const SYNTHETIC_FIRST_NAMES = [
@@ -314,6 +337,7 @@ const CLUBS: Club[] = [
       "The largest technical club at IUB, fostering innovation through hackathons, workshops, and tech talks. We connect students with industry leaders and prepare them for the digital economy.",
     category: "Technology",
     admin_user_id: "user_2",
+    coordinator_ids: ["user_9"],
     member_count: 259,
     cover_url:
       "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=800&h=400&fit=crop&auto=format",
@@ -1025,7 +1049,34 @@ export function updateMemberRole(
   };
 }
 
-export function registerForEvent(state: StoreState, userId: string, eventId: string): StoreState {
+export interface RegistrationContact {
+  full_name?: string;
+  contact_email?: string;
+  phone?: string;
+}
+
+/**
+ * Clubs a user manages: a `club_admin` owns a club via `admin_user_id`, while a
+ * `coordinator` manages any club listing their id in `coordinator_ids`.
+ */
+export function clubsManagedBy(
+  state: StoreState,
+  user: User | null | undefined
+): Club[] {
+  if (!user) return [];
+  if (user.role === "coordinator")
+    return state.clubs.filter((c) =>
+      (c.coordinator_ids ?? []).includes(user.id)
+    );
+  return state.clubs.filter((c) => c.admin_user_id === user.id);
+}
+
+export function registerForEvent(
+  state: StoreState,
+  userId: string,
+  eventId: string,
+  contact?: RegistrationContact
+): StoreState {
   const event = state.events.find((e) => e.id === eventId);
   if (!event) return state;
 
@@ -1034,37 +1085,36 @@ export function registerForEvent(state: StoreState, userId: string, eventId: str
   );
   if (existing) return state;
 
+  // Hard capacity enforcement — no waitlist. Registration is blocked when full.
   const isFull = event.registered_count >= event.capacity;
-  const status: Registration["status"] = isFull ? "waitlisted" : "registered";
-  const waitlistPos = isFull ? event.waitlisted_count + 1 : undefined;
+  if (isFull) return state;
 
   const newReg: Registration = {
     id: newRegId(),
     user_id: userId,
     event_id: eventId,
-    status,
+    status: "registered",
     registered_at: new Date().toISOString(),
+    full_name: contact?.full_name,
+    contact_email: contact?.contact_email,
+    phone: contact?.phone,
   };
 
   const newNotif: Notification = {
     id: newNotifId(),
     user_id: userId,
-    type: status === "registered" ? "registration" : "waitlist",
-    message:
-      status === "registered"
-        ? `You have successfully registered for "${event.title}".`
-        : `You joined the waitlist for "${event.title}". Your position: #${waitlistPos}.`,
+    type: "registration",
+    message: `You have successfully registered for "${event.title}".`,
     is_read: false,
     created_at: new Date().toISOString(),
     event_id: eventId,
   };
 
-  const updatedEvents = state.events.map((e) => {
-    if (e.id !== eventId) return e;
-    return status === "registered"
-      ? { ...e, registered_count: e.registered_count + 1 }
-      : { ...e, waitlisted_count: e.waitlisted_count + 1 };
-  });
+  const updatedEvents = state.events.map((e) =>
+    e.id !== eventId
+      ? e
+      : { ...e, registered_count: e.registered_count + 1 }
+  );
 
   return {
     ...state,
@@ -1080,7 +1130,8 @@ export function cancelRegistration(state: StoreState, userId: string, eventId: s
   );
   if (!reg) return state;
 
-  let newState = {
+  // Waitlist removed: simply free the seat. No auto-promotion.
+  return {
     ...state,
     registrations: state.registrations.filter((r) => r.id !== reg.id),
     events: state.events.map((e) => {
@@ -1090,43 +1141,6 @@ export function cancelRegistration(state: StoreState, userId: string, eventId: s
         : { ...e, waitlisted_count: Math.max(0, e.waitlisted_count - 1) };
     }),
   };
-
-  // Waitlist auto-promotion: if cancelled was registered, promote first waitlisted
-  if (reg.status === "registered") {
-    const nextWaitlisted = newState.registrations
-      .filter((r) => r.event_id === eventId && r.status === "waitlisted")
-      .sort((a, b) => a.registered_at.localeCompare(b.registered_at))[0];
-
-    if (nextWaitlisted) {
-      const promotionNotif: Notification = {
-        id: newNotifId(),
-        user_id: nextWaitlisted.user_id,
-        type: "registration",
-        message: `Great news! A spot opened up — you are now registered for "${state.events.find((e) => e.id === eventId)?.title}".`,
-        is_read: false,
-        created_at: new Date().toISOString(),
-        event_id: eventId,
-      };
-
-      newState = {
-        ...newState,
-        registrations: newState.registrations.map((r) =>
-          r.id === nextWaitlisted.id ? { ...r, status: "registered" } : r
-        ),
-        events: newState.events.map((e) => {
-          if (e.id !== eventId) return e;
-          return {
-            ...e,
-            registered_count: e.registered_count + 1,
-            waitlisted_count: Math.max(0, e.waitlisted_count - 1),
-          };
-        }),
-        notifications: [...newState.notifications, promotionNotif],
-      };
-    }
-  }
-
-  return newState;
 }
 
 // QR check-in: mark a registration as attended (or undo it).
@@ -1154,7 +1168,18 @@ export function setCheckIn(
   };
 }
 
-export function applyToClub(state: StoreState, userId: string, clubId: string): StoreState {
+export interface ClubApplication {
+  contact_email?: string;
+  phone?: string;
+  motivation?: string;
+}
+
+export function applyToClub(
+  state: StoreState,
+  userId: string,
+  clubId: string,
+  application?: ClubApplication
+): StoreState {
   const existing = state.memberships.find(
     (m) => m.user_id === userId && m.club_id === clubId
   );
@@ -1169,6 +1194,9 @@ export function applyToClub(state: StoreState, userId: string, clubId: string): 
     club_id: clubId,
     status: "pending",
     applied_at: new Date().toISOString(),
+    contact_email: application?.contact_email,
+    phone: application?.phone,
+    motivation: application?.motivation,
   };
 
   const user = state.users.find((u) => u.id === userId);
@@ -1612,6 +1640,7 @@ export function changeUserRole(
 
   const label: Record<UserRole, string> = {
     student: "Student",
+    coordinator: "Co-ordinator",
     club_admin: "Club Admin",
     super_admin: "Super Admin",
   };

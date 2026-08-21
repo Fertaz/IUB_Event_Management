@@ -25,18 +25,18 @@ import {
 } from "../lib/eventUtils";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
+import { clubsManagedBy } from "../lib/store";
 import { EmptyState } from "../components/EmptyState";
 
 export function EventManagePage() {
   const { store, doCancelEvent, doDeleteEvent } = useData();
-  const { currentUser } = useAuth();
+  const { currentUser, isCoordinator } = useAuth();
   const navigate = useNavigate();
 
-  const myClub = store.clubs.find(
-    (c) => c.admin_user_id === currentUser?.id,
-  );
+  const managedClubs = clubsManagedBy(store, currentUser);
+  const managedClubIds = managedClubs.map((c) => c.id);
   const myEvents = store.events
-    .filter((e) => e.club_id === myClub?.id)
+    .filter((e) => managedClubIds.includes(e.club_id))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   return (
@@ -44,7 +44,7 @@ export function EventManagePage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
-            Club Admin
+            {isCoordinator ? "Co-ordinator" : "Club Admin"}
           </p>
           <h1
             style={{ fontFamily: "'Outfit', sans-serif" }}

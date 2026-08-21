@@ -20,13 +20,15 @@ import { ClubDetailPage } from "./pages/ClubDetailPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
+import { CoordinatorDashboard } from "./pages/CoordinatorDashboard";
 import { EventManagePage } from "./pages/EventManagePage";
 import { EventFormPage } from "./pages/EventFormPage";
 import { AttendeeRosterPage } from "./pages/AttendeeRosterPage";
 import { MembershipRequestsPage } from "./pages/MembershipRequestsPage";
 import { MemberRosterPage } from "./pages/MemberRosterPage";
-import { RequestRolePage } from "./pages/RequestRolePage";
 import { SuperAdminPage } from "./pages/SuperAdminPage";
+import { ClubApplicationForm } from "./pages/ClubApplicationForm";
+import { EventRegistrationForm } from "./pages/EventRegistrationForm";
 export default function App() {
   const routerBase = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "") || "/";
 
@@ -88,6 +90,22 @@ function AppContent() {
                   element={<ClubDetailPage />}
                 />
                 <Route
+                  path="clubs/:id/apply"
+                  element={
+                    <ProtectedRoute role="student">
+                      <ClubApplicationForm />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="events/:id/register"
+                  element={
+                    <ProtectedRoute role="student">
+                      <EventRegistrationForm />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="notifications"
                   element={<NotificationsPage />}
                 />
@@ -95,9 +113,14 @@ function AppContent() {
                   path="profile"
                   element={<ProfilePage />}
                 />
+
                 <Route
-                  path="request-role"
-                  element={<RequestRolePage />}
+                  path="coordinator"
+                  element={
+                    <ProtectedRoute role="coordinator">
+                      <CoordinatorDashboard />
+                    </ProtectedRoute>
+                  }
                 />
 
                 <Route
@@ -111,7 +134,7 @@ function AppContent() {
                 <Route
                   path="admin/events"
                   element={
-                    <ProtectedRoute role="club_admin">
+                    <ProtectedRoute role={["club_admin", "coordinator"]}>
                       <EventManagePage />
                     </ProtectedRoute>
                   }
@@ -119,7 +142,7 @@ function AppContent() {
                 <Route
                   path="admin/events/new"
                   element={
-                    <ProtectedRoute role="club_admin">
+                    <ProtectedRoute role={["club_admin", "coordinator"]}>
                       <EventFormPage />
                     </ProtectedRoute>
                   }
@@ -127,7 +150,7 @@ function AppContent() {
                 <Route
                   path="admin/events/edit/:id"
                   element={
-                    <ProtectedRoute role="club_admin">
+                    <ProtectedRoute role={["club_admin", "coordinator"]}>
                       <EventFormPage />
                     </ProtectedRoute>
                   }
@@ -135,7 +158,7 @@ function AppContent() {
                 <Route
                   path="admin/events/:id/roster"
                   element={
-                    <ProtectedRoute role="club_admin">
+                    <ProtectedRoute role={["club_admin", "coordinator"]}>
                       <AttendeeRosterPage />
                     </ProtectedRoute>
                   }

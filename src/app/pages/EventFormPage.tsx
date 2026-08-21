@@ -23,6 +23,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
+import { clubsManagedBy } from "../lib/store";
 
 export function EventFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -32,9 +33,11 @@ export function EventFormPage() {
 
   const isEdit = !!id;
   const existingEvent = store.events.find((e) => e.id === id);
-  const myClub = store.clubs.find(
-    (c) => c.admin_user_id === currentUser?.id,
-  );
+  const managedClubs = clubsManagedBy(store, currentUser);
+  // For edits keep the event's own club; for new events use the first managed club.
+  const myClub = existingEvent
+    ? store.clubs.find((c) => c.id === existingEvent.club_id)
+    : managedClubs[0];
 
   const [form, setForm] = useState({
     title: existingEvent?.title ?? "",

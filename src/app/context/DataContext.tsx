@@ -12,9 +12,23 @@ import type {
 
 export interface DataContextValue {
   store: StoreState;
-  doRegister: (eventId: string) => void;
+  doRegister: (
+    eventId: string,
+    contact?: {
+      full_name?: string;
+      contact_email?: string;
+      phone?: string;
+    },
+  ) => void;
   doCancel: (eventId: string) => void;
-  doApplyClub: (clubId: string) => void;
+  doApplyClub: (
+    clubId: string,
+    application?: {
+      contact_email?: string;
+      phone?: string;
+      motivation?: string;
+    },
+  ) => void;
   doReviewMembership: (
     membershipId: string,
     action: "approved" | "rejected",
