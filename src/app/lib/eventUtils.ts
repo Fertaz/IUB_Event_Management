@@ -107,9 +107,12 @@ export function downloadICS(event: Event, club?: Club): void {
   a.href = url;
   a.download = `${event.title.replace(/[^\w-]+/g, "_").toLowerCase()}.ics`;
   document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  try {
+    a.click();
+  } finally {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 }
 
 // Build a "Add to Google Calendar" URL. ctz pins the campus timezone.
@@ -155,13 +158,18 @@ export async function shareEvent(event: Event): Promise<"shared" | "copied" | "f
       await navigator.share(shareData);
       return "shared";
     }
-  } catch {
-    // user cancelled or share failed — fall through to clipboard
+  } catch (error) {
+    if ((error as { name?: string }).name !== "AbortError") {
+      // Share failed; fall through to clipboard.
+    }
   }
   try {
-    await navigator.clipboard.writeText(url);
-    return "copied";
-  } catch {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url);
+      return "copied";
+    }
+    return "failed";
+  } catch (error) {
     return "failed";
   }
 }

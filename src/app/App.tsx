@@ -186,8 +186,8 @@ function loadStore(): StoreState {
       seedCounters(parsed);
       return parsed;
     }
-  } catch {
-    // corrupt or unavailable storage — fall back to seed data
+  } catch (error) {
+    console.warn("Failed to load persisted store, using seed data.", error);
   }
   return initialState;
 }
@@ -195,7 +195,8 @@ function loadStore(): StoreState {
 function loadAuth(): string | null {
   try {
     return localStorage.getItem(AUTH_KEY) || null;
-  } catch {
+  } catch (error) {
+    console.warn("Failed to load persisted auth session.", error);
     return null;
   }
 }
@@ -291,8 +292,8 @@ function Providers({
   useEffect(() => {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(store));
-    } catch {
-      // storage full or unavailable — ignore, app still works in-memory
+    } catch (error) {
+      console.warn("Failed to persist store to localStorage.", error);
     }
   }, [store]);
 
@@ -301,8 +302,8 @@ function Providers({
       if (currentUserId)
         localStorage.setItem(AUTH_KEY, currentUserId);
       else localStorage.removeItem(AUTH_KEY);
-    } catch {
-      // ignore storage errors
+    } catch (error) {
+      console.warn("Failed to persist auth session.", error);
     }
   }, [currentUserId]);
 
