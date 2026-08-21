@@ -1,70 +1,17 @@
-import React, {
-  createContext,
-  useContext,
+import {
   useState,
   useCallback,
-  useEffect,
+  useEffect
 } from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  Link,
-  useNavigate,
-  useParams,
-  useLocation,
-} from "react-router";
 
-import { toast, Toaster } from "sonner";
-import { format, parseISO, isPast } from "date-fns";
+import { toast } from "sonner";
+import { format, parseISO } from "date-fns";
 import {
-  LayoutDashboard,
-  CalendarDays,
-  Users,
-  Bell,
-  User as UserIcon,
-  Menu,
-  ChevronRight,
-  Search,
-  Plus,
-  Clock,
-  MapPin,
-  Ticket,
-  AlertCircle,
-  CheckCircle2,
-  XCircle,
-  List,
-  UserCheck,
-  Settings,
-  Trash2,
-  Edit3,
-  BookOpen,
-  Shield,
-  UserCog,
-  BadgeCheck,
-  Hourglass,
-  ChevronDown,
-  ArrowLeft,
-  Globe,
-  CalendarCheck,
-  Share2,
-  CalendarPlus,
-  Download,
-  Repeat,
-  MailCheck,
+  Users, Plus, Trash2,
+  Edit3
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Badge } from "../components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "../components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -75,14 +22,6 @@ import {
   DialogTrigger,
 } from "../components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../components/ui/dropdown-menu";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -90,25 +29,10 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "../components/ui/tabs";
-import {
   Avatar,
   AvatarFallback,
 } from "../components/ui/avatar";
-import { Separator } from "../components/ui/separator";
-import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "../components/ui/sheet";
 import {
   Table,
   TableBody,
@@ -117,67 +41,9 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { ImageWithFallback } from "../components/figma/ImageWithFallback";
-import {
-  downloadICS,
-  googleCalendarUrl,
-  shareEvent,
-  checkInCode,
-  parseCheckInCode,
-  getOccurrences,
-  recurrenceLabel,
-  formatEventTime,
-} from "../lib/eventUtils";
-import { QRCodeSVG } from "qrcode.react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip as RTooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 import type {
-  StoreState,
-  User,
-  UserRole,
-  ClubRole,
-  Club,
-  Event,
-  Notification,
-  RoleRequest,
+  ClubRole
 } from "../lib/store";
-import {
-  initialState,
-  registerForEvent,
-  cancelRegistration,
-  applyToClub,
-  reviewMembership,
-  removeMember,
-  assignClubRoles,
-  updateMemberRole,
-  createEvent,
-  updateEvent,
-  cancelEvent,
-  deleteEventAdmin,
-  deleteClubAdmin,
-  markNotificationsRead,
-  updateProfile,
-  registerUser,
-  submitRoleRequest,
-  reviewRoleRequest,
-  changeUserRole,
-  seedCounters,
-  setCheckIn,
-  toggleEventException,
-  sendDigest,
-} from "../lib/store";
-import { authService } from "../services/authService";
-import {
-  fetchAppState,
-  persistAppState,
-} from "../services/stateService";
 import {
   fetchClubMembers,
   assignRoles as assignClubRolesApi,
@@ -192,6 +58,7 @@ import { getInitials, roleBadgeClass } from "../lib/uiHelpers";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { EmptyState } from "../components/EmptyState";
+import { Spinner } from "../components/Spinner";
 
 const CLUB_ROLES: ClubRole[] = [
   "President",
@@ -567,9 +434,9 @@ export function MemberRosterPage() {
       </Dialog>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground py-8 text-center font-mono">
-          Loading members…
-        </p>
+        <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+          <Spinner /> Loading members…
+        </div>
       ) : members.length === 0 ? (
         <EmptyState icon={Users} title="No members yet" description="" />
       ) : (

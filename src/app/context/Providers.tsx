@@ -58,6 +58,7 @@ import {
   DataContext,
   type DataContextValue,
 } from "./DataContext";
+import { LoadingScreen } from "../components/Spinner";
 export function Providers({
   children,
 }: {
@@ -538,13 +539,7 @@ export function Providers({
   };
 
   if (isBootstrapping) {
-    return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">
-          Loading campus hub...
-        </p>
-      </div>
-    );
+    return <LoadingScreen label="Loading campus hub..." />;
   }
 
   const dataValue: DataContextValue = {
