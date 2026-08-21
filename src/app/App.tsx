@@ -48,6 +48,9 @@ import {
   ArrowLeft,
   Globe,
   CalendarCheck,
+  Share2,
+  CalendarPlus,
+  Download,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -105,6 +108,23 @@ import {
   TableRow,
 } from "@/app/components/ui/table";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+import {
+  downloadICS,
+  googleCalendarUrl,
+  shareEvent,
+  checkInCode,
+  parseCheckInCode,
+} from "@/app/lib/eventUtils";
+import { QRCodeSVG } from "qrcode.react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
 import type {
   StoreState,
   User,
@@ -116,8 +136,6 @@ import type {
   Notification,
   RoleRequest,
 } from "@/app/lib/store";
-import CheckinScanner from "@/app/components/ui/CheckinScanner";
-import QrView from "@/app/components/ui/QrView";
 import {
   initialState,
   registerForEvent,
@@ -136,7 +154,37 @@ import {
   submitRoleRequest,
   reviewRoleRequest,
   changeUserRole,
+  seedCounters,
+  setCheckIn,
 } from "@/app/lib/store";
+
+// ─── Persistence ──────────────────────────────────────────────────────────────
+// The in-memory store is mirrored to localStorage so demo data survives reloads.
+// Bump the version suffix whenever the data shape changes to discard stale state.
+const STORE_KEY = "iub_hub_store_v1";
+const AUTH_KEY = "iub_hub_auth_v1";
+
+function loadStore(): StoreState {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as StoreState;
+      seedCounters(parsed);
+      return parsed;
+    }
+  } catch {
+    // corrupt or unavailable storage — fall back to seed data
+  }
+  return initialState;
+}
+
+function loadAuth(): string | null {
+  try {
+    return localStorage.getItem(AUTH_KEY) || null;
+  } catch {
+    return null;
+  }
+}
 
 // ─── Auth Context ─────────────────────────────────────────────────────────────
 
@@ -172,6 +220,7 @@ interface DataContextValue {
   doSubmitRoleRequest: (payload: Omit<RoleRequest, "id" | "user_id" | "status" | "created_at">) => void;
   doReviewRoleRequest: (requestId: string, action: "approved" | "rejected") => void;
   doChangeUserRole: (userId: string, newRole: UserRole) => void;
+  doCheckIn: (registrationId: string, value: boolean) => void;
 }
 
 const DataContext = createContext<DataContextValue>({} as DataContextValue);
@@ -180,10 +229,28 @@ const useData = () => useContext(DataContext);
 // ─── Providers ────────────────────────────────────────────────────────────────
 
 function Providers({ children }: { children: React.ReactNode }) {
-  const [store, setStore] = useState<StoreState>(initialState);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [store, setStore] = useState<StoreState>(loadStore);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(loadAuth);
 
   const currentUser = store.users.find((u) => u.id === currentUserId) ?? null;
+
+  // Persist store + session to localStorage on every change.
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(store));
+    } catch {
+      // storage full or unavailable — ignore, app still works in-memory
+    }
+  }, [store]);
+
+  useEffect(() => {
+    try {
+      if (currentUserId) localStorage.setItem(AUTH_KEY, currentUserId);
+      else localStorage.removeItem(AUTH_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }, [currentUserId]);
 
   const switchRole = useCallback((userId: string) => {
     setCurrentUserId(userId);
@@ -366,6 +433,10 @@ function Providers({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const doCheckIn = useCallback((registrationId: string, value: boolean) => {
+    setStore((s) => setCheckIn(s, registrationId, value));
+  }, []);
+
   const authValue: AuthContextValue = {
     currentUser,
     switchRole,
@@ -393,6 +464,7 @@ function Providers({ children }: { children: React.ReactNode }) {
     doSubmitRoleRequest,
     doReviewRoleRequest,
     doChangeUserRole,
+    doCheckIn,
   };
 
   return (
@@ -1892,6 +1964,43 @@ function EventDetailPage() {
                     </span>
                   )}
                 </div>
+                {myReg.status === "registered" &&
+                  (myReg.checked_in ? (
+                    <div className="rounded-md bg-quaternary/15 border border-quaternary/40 p-3 text-xs text-foreground text-center font-medium flex items-center justify-center gap-1.5">
+                      <BadgeCheck className="size-4" /> Checked in
+                      {myReg.checked_in_at &&
+                        ` · ${format(parseISO(myReg.checked_in_at), "d MMM, HH:mm")}`}
+                    </div>
+                  ) : (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="w-full">
+                          <Ticket className="size-4 mr-2" /> Show Check-in QR
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-sm">
+                        <DialogHeader>
+                          <DialogTitle>Your check-in ticket</DialogTitle>
+                          <DialogDescription>
+                            Present this QR code at the event entrance for contactless
+                            check-in.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col items-center gap-4 py-4">
+                          <div className="bg-white p-4 rounded-xl border-2 border-border">
+                            <QRCodeSVG
+                              value={checkInCode(event.id, myReg.id)}
+                              size={200}
+                              level="M"
+                            />
+                          </div>
+                          <p className="text-xs font-mono text-muted-foreground">
+                            {currentUser?.name} · {event.title}
+                          </p>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  ))}
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button
@@ -1945,6 +2054,48 @@ function EventDetailPage() {
                 <Ticket className="size-4 mr-2" /> Register Now
               </Button>
             )}
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <p className="text-xs font-mono text-muted-foreground">Add & share</p>
+            <div className="grid grid-cols-1 gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start">
+                    <CalendarPlus className="size-4 mr-2" /> Add to Calendar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuItem
+                    onClick={() =>
+                      window.open(googleCalendarUrl(event, club), "_blank", "noopener")
+                    }
+                  >
+                    <CalendarDays className="size-4 mr-2" /> Google Calendar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => downloadICS(event, club)}>
+                    <Download className="size-4 mr-2" /> Download .ics
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={async () => {
+                  const result = await shareEvent(event);
+                  if (result === "copied")
+                    toast.success("Link copied", {
+                      description: "Event link copied to your clipboard.",
+                    });
+                  else if (result === "failed")
+                    toast.error("Couldn't share", {
+                      description: "Please copy the page URL manually.",
+                    });
+                }}
+              >
+                <Share2 className="size-4 mr-2" /> Share Event
+              </Button>
+            </div>
           </div>
 
           <div className="bg-card border border-border rounded-xl p-4">
@@ -2458,6 +2609,27 @@ function AdminDashboardPage() {
     (m) => m.club_id === myClub.id && m.status === "approved"
   ).length;
 
+  // Attendance analytics: registrations vs check-ins across this club's events.
+  const chartData = myEvents
+    .map((e) => {
+      const regs = store.registrations.filter(
+        (r) => r.event_id === e.id && r.status === "registered"
+      );
+      return {
+        id: e.id,
+        name: e.title.length > 18 ? `${e.title.slice(0, 18)}…` : e.title,
+        registrations: e.registered_count,
+        checkedIn: regs.filter((r) => r.checked_in).length,
+      };
+    })
+    .sort((a, b) => b.registrations - a.registrations)
+    .slice(0, 6);
+  const totalCheckedIn = store.registrations.filter(
+    (r) => myEvents.some((e) => e.id === r.event_id) && r.checked_in
+  ).length;
+  const attendanceRate =
+    totalRegistrations > 0 ? Math.round((totalCheckedIn / totalRegistrations) * 100) : 0;
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <div>
@@ -2473,6 +2645,69 @@ function AdminDashboardPage() {
         <StatCard icon={CalendarDays} label="Upcoming Events" value={upcoming.length} color="accent" />
         <StatCard icon={Ticket} label="Registrations" value={totalRegistrations} color="green" />
         <StatCard icon={UserCheck} label="Pending Requests" value={pendingReqs} color="purple" />
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-semibold">
+            Event Engagement
+          </h2>
+          <div className="text-right">
+            <p className="text-2xl font-mono font-bold text-quaternary">{attendanceRate}%</p>
+            <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest">
+              attendance rate
+            </p>
+          </div>
+        </div>
+        {chartData.length === 0 ? (
+          <EmptyState icon={CalendarDays} title="No events yet" description="Create an event to see engagement analytics." />
+        ) : (
+          <ResponsiveContainer width="100%" height={Math.max(160, chartData.length * 46)}>
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+              barCategoryGap={12}
+            >
+              <XAxis type="number" hide />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={140}
+                tick={{ fontSize: 11, fontFamily: "monospace" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <RTooltip
+                cursor={{ fill: "var(--muted)" }}
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "2px solid var(--border)",
+                  fontSize: 12,
+                  fontFamily: "monospace",
+                }}
+                formatter={(value: number, name: string) => [
+                  value,
+                  name === "registrations" ? "Registered" : "Checked in",
+                ]}
+              />
+              <Bar dataKey="registrations" radius={[0, 6, 6, 0]} fill="var(--primary)">
+                {chartData.map((d) => (
+                  <Cell key={d.id} fill="var(--primary)" />
+                ))}
+              </Bar>
+              <Bar dataKey="checkedIn" radius={[0, 6, 6, 0]} fill="var(--quaternary)" />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+        <div className="flex items-center gap-4 mt-3 text-xs font-mono text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-sm" style={{ background: "var(--primary)" }} /> Registered
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-sm" style={{ background: "var(--quaternary)" }} /> Checked in
+          </span>
+        </div>
       </div>
 
       <div className="grid sm:grid-cols-3 gap-3">
@@ -2622,24 +2857,6 @@ function EventManagePage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => navigate(`/admin/events/${e.id}/qr`)}
-                    title="Generate QR"
-                  >
-                    <CalendarCheck className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => navigate(`/admin/events/${e.id}/checkin`)}
-                    title="Check-in (camera)"
-                  >
-                    <Ticket className="size-3.5" />
-                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -2914,16 +3131,41 @@ const FAKE_NAMES = [
 
 function AttendeeRosterPage() {
   const { id } = useParams<{ id: string }>();
-  const { store } = useData();
+  const { store, doCheckIn } = useData();
   const navigate = useNavigate();
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanCode, setScanCode] = useState("");
 
   const event = store.events.find((e) => e.id === id);
   const realRegs = store.registrations.filter((r) => r.event_id === id);
   const realRegistered = realRegs.filter((r) => r.status === "registered");
   const realWaitlisted = realRegs.filter((r) => r.status === "waitlisted");
+  const checkedInCount = realRegistered.filter((r) => r.checked_in).length;
 
   const fakePadding = Math.max(0, (event?.registered_count ?? 0) - realRegistered.length);
   const fakeAttendees = FAKE_NAMES.slice(0, fakePadding);
+
+  const handleScan = () => {
+    const parsed = parseCheckInCode(scanCode);
+    if (!parsed || parsed.eventId !== id) {
+      toast.error("Invalid code", { description: "That QR code isn't for this event." });
+      return;
+    }
+    const reg = realRegistered.find((r) => r.id === parsed.registrationId);
+    if (!reg) {
+      toast.error("Not found", { description: "No matching registration for this event." });
+      return;
+    }
+    const attendee = store.users.find((u) => u.id === reg.user_id);
+    if (reg.checked_in) {
+      toast.info("Already checked in", { description: `${attendee?.name} is already checked in.` });
+    } else {
+      doCheckIn(reg.id, true);
+      toast.success("Checked in", { description: `${attendee?.name} is now checked in.` });
+    }
+    setScanCode("");
+    setScanOpen(false);
+  };
 
   if (!event) {
     return (
@@ -2955,13 +3197,54 @@ function AttendeeRosterPage() {
         <div className="text-right">
           <p className="text-2xl font-mono font-bold">{event.registered_count}/{event.capacity}</p>
           <p className="text-xs text-muted-foreground font-mono">registered</p>
+          <p className="text-xs text-quaternary font-mono mt-0.5">
+            {checkedInCount} checked in
+          </p>
           {event.waitlisted_count > 0 && (
             <p className="text-xs text-accent font-mono mt-0.5">{event.waitlisted_count} waitlisted</p>
           )}
         </div>
       </div>
 
-      <CapacityBar registered={event.registered_count} capacity={event.capacity} />
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <CapacityBar registered={event.registered_count} capacity={event.capacity} />
+        <Dialog open={scanOpen} onOpenChange={setScanOpen}>
+          <DialogTrigger asChild>
+            <Button className="shrink-0 bg-primary hover:bg-primary/90">
+              <CheckCircle2 className="size-4 mr-2" /> Scan Check-in
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Scan attendee QR</DialogTitle>
+              <DialogDescription>
+                Scan the attendee's QR with any reader and paste the decoded code below, or
+                enter it manually to check them in.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              <Label htmlFor="scan-code" className="text-xs font-mono">
+                Check-in code
+              </Label>
+              <Input
+                id="scan-code"
+                value={scanCode}
+                onChange={(e) => setScanCode(e.target.value)}
+                placeholder="CHK|event_1|reg_1"
+                onKeyDown={(e) => e.key === "Enter" && handleScan()}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setScanOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleScan} disabled={!scanCode.trim()}>
+                Check in
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       <Tabs defaultValue="registered" className="mt-6">
         <TabsList className="bg-muted">
@@ -2978,6 +3261,7 @@ function AttendeeRosterPage() {
                   <TableHead className="text-xs font-mono">Name</TableHead>
                   <TableHead className="text-xs font-mono">Department</TableHead>
                   <TableHead className="text-xs font-mono">Registered At</TableHead>
+                  <TableHead className="text-xs font-mono text-right">Check-in</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -3000,6 +3284,27 @@ function AttendeeRosterPage() {
                       <TableCell className="text-xs font-mono text-muted-foreground">
                         {format(parseISO(r.registered_at), "d MMM · HH:mm")}
                       </TableCell>
+                      <TableCell className="text-right">
+                        {r.checked_in ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-quaternary hover:text-quaternary h-7"
+                            onClick={() => doCheckIn(r.id, false)}
+                          >
+                            <BadgeCheck className="size-3.5 mr-1" /> In
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7"
+                            onClick={() => doCheckIn(r.id, true)}
+                          >
+                            Check in
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -3020,6 +3325,7 @@ function AttendeeRosterPage() {
                     </TableCell>
                     <TableCell className="text-xs font-mono text-muted-foreground">CSE</TableCell>
                     <TableCell className="text-xs font-mono text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-xs font-mono text-muted-foreground">—</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -3956,22 +4262,6 @@ function AppContent() {
                   element={
                     <ProtectedRoute role="club_admin">
                       <AttendeeRosterPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="admin/events/:id/checkin"
-                  element={
-                    <ProtectedRoute role="club_admin">
-                      <CheckinScanner />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="admin/events/:id/qr"
-                  element={
-                    <ProtectedRoute role="club_admin">
-                      <QrView />
                     </ProtectedRoute>
                   }
                 />
