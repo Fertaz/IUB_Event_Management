@@ -1,4 +1,22 @@
-import { apiClient, setAuthToken } from "@/app/services/apiClient";
+/**
+ * authService.ts
+ *
+ * Authentication layer. Uses Firebase Auth (email/password) when Firebase is
+ * configured; otherwise falls back to a local demo mode so the app still runs
+ * without a configured project.
+ *
+ * The authenticated identity is an email address. Providers maps that email to
+ * a `users` record in the store (email is the link key) to resolve the current
+ * user + role.
+ */
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  type User as FirebaseUser,
+} from "firebase/auth";
+import { auth, isFirebaseConfigured } from "@/app/lib/firebase";
 
 export interface LoginCredentials {
   email: string;
@@ -13,74 +31,73 @@ export interface RegisterPayload {
   password: string;
 }
 
-interface AuthResult {
-  token: string;
-  userId: string;
-}
-
-const DEMO_CREDENTIALS: Record<
-  string,
-  { password: string; userId: string }
-> = {
-  "admin@iub.edu.bd": {
-    password: "Admin@12345",
-    userId: "user_3",
-  },
-  "shoikat.azad@iub.edu.bd": {
-    password: "Club@12345",
-    userId: "user_2",
-  },
-  "anika.rahman@iub.edu.bd": {
-    password: "Student@12345",
-    userId: "user_1",
-  },
+/**
+ * Demo credentials used only when Firebase is not configured. These emails
+ * exist in the seeded demo store, so login resolves to a real store user.
+ */
+const DEMO_CREDENTIALS: Record<string, string> = {
+  "admin@iub.edu.bd": "Admin@12345",
+  "shoikat.azad@iub.edu.bd": "Club@12345",
+  "anika.rahman@iub.edu.bd": "Student@12345",
 };
 
-function resolveDemoUserId(
-  credentials: LoginCredentials,
-): string | null {
-  const email = credentials.email.trim().toLowerCase();
-  const demo = DEMO_CREDENTIALS[email];
-  if (!demo || demo.password !== credentials.password) {
-    return null;
+function assertIubEmail(email: string): void {
+  if (!email.trim().toLowerCase().endsWith("@iub.edu.bd")) {
+    throw new Error("Only @iub.edu.bd email addresses are allowed.");
   }
-  return demo.userId;
 }
 
 class AuthService {
+  /** Signs in and returns the authenticated email (lower-cased). */
   async login(credentials: LoginCredentials): Promise<string> {
-    try {
-      const result = await apiClient<AuthResult>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify(credentials),
-      });
-      setAuthToken(result.token);
-      return result.userId;
-    } catch (error) {
-      const demoUserId = resolveDemoUserId(credentials);
-      if (!demoUserId) {
-        throw error;
-      }
-      setAuthToken(null);
-      return demoUserId;
+    const email = credentials.email.trim().toLowerCase();
+    assertIubEmail(email);
+
+    if (isFirebaseConfigured && auth) {
+      await signInWithEmailAndPassword(auth, email, credentials.password);
+      return email;
     }
+
+    // Demo fallback.
+    const expected = DEMO_CREDENTIALS[email];
+    if (!expected || expected !== credentials.password) {
+      throw new Error("Invalid email or password.");
+    }
+    return email;
   }
 
+  /** Creates an account and returns the authenticated email (lower-cased). */
   async register(payload: RegisterPayload): Promise<string> {
-    const result = await apiClient<AuthResult>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    setAuthToken(result.token);
-    return result.userId;
+    const email = payload.email.trim().toLowerCase();
+    assertIubEmail(email);
+
+    if (isFirebaseConfigured && auth) {
+      await createUserWithEmailAndPassword(auth, email, payload.password);
+      return email;
+    }
+
+    // Demo fallback — no real account, just echo the email back.
+    return email;
   }
 
   async logout(): Promise<void> {
-    try {
-      await apiClient<void>("/auth/logout", { method: "POST" });
-    } finally {
-      setAuthToken(null);
+    if (isFirebaseConfigured && auth) {
+      await signOut(auth);
     }
+  }
+
+  /**
+   * Subscribes to auth-state changes (session restore, sign-in/out).
+   * Emits the lower-cased email or null. Returns an unsubscribe function.
+   * No-op in demo mode.
+   */
+  onAuthChange(callback: (email: string | null) => void): () => void {
+    if (!isFirebaseConfigured || !auth) {
+      return () => {};
+    }
+    return onAuthStateChanged(auth, (user: FirebaseUser | null) => {
+      callback(user?.email ? user.email.toLowerCase() : null);
+    });
   }
 }
 

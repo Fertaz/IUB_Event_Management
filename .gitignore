@@ -1,3 +1,10 @@
-node_modules
+﻿node_modules
 dist
-server/data
+.env
+.env.*
+!.env.example
+
+# Firebase
+.firebase
+firebase-debug.log
+firestore-debug.log

@@ -42,11 +42,7 @@ import {
   fetchAppState,
   persistAppState,
 } from "../services/stateService";
-import {
-  assignRoles as assignClubRolesApi,
-  updateMemberRole as updateMemberRoleApi,
-  deleteMember as deleteMemberApi,
-} from "../services/memberService";
+import { registerLiveStore } from "../lib/liveStore";
 import {
   createEmptyStore,
   createDemoStore,
@@ -71,15 +67,32 @@ export function Providers({
   const storeRef = React.useRef<StoreState>(store);
   storeRef.current = store;
 
-  const [currentUserId, setCurrentUserId] = useState<
-    string | null
-  >(null);
+  // Expose the live store to non-React modules (e.g. memberService) so member
+  // operations mutate the one source of truth and auto-persist.
+  useEffect(() => {
+    registerLiveStore(() => storeRef.current, setStore);
+  }, []);
+
+  // The authenticated identity is an email. currentUser is derived by matching
+  // that email to a users record in the store.
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isBackendAvailable, setIsBackendAvailable] =
     useState(true);
 
-  const currentUser =
-    store.users.find((u) => u.id === currentUserId) ?? null;
+  const currentUser = authEmail
+    ? store.users.find(
+        (u) => u.email.toLowerCase() === authEmail.toLowerCase(),
+      ) ?? null
+    : null;
+  const currentUserId = currentUser?.id ?? null;
+
+  // Restore / track the Firebase Auth session (no-op in demo mode).
+  useEffect(() => {
+    return authService.onAuthChange((email) => {
+      setAuthEmail(email);
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,16 +103,14 @@ export function Providers({
         if (cancelled) return;
         seedCounters(snapshot.store);
         setStore(syncMemberCounts(snapshot.store));
-        setCurrentUserId(snapshot.currentUserId);
         setIsBackendAvailable(true);
       } catch (error) {
-        console.error("Failed to load backend state.", error);
+        console.error("Failed to load Firebase state.", error);
         const demoStore = createDemoStore();
         if (cancelled) return;
         setStore(demoStore);
-        setCurrentUserId(null);
         setIsBackendAvailable(false);
-        toast.info("Backend unavailable — demo mode enabled", {
+        toast.info("Firebase not configured — demo mode enabled", {
           description:
             "Using local seeded demo data for login and browsing.",
         });
@@ -116,38 +127,29 @@ export function Providers({
   }, []);
 
   useEffect(() => {
-    if (isBootstrapping || !isBackendAvailable) return;
-    void persistAppState({ store, currentUserId }).catch((error) => {
-      console.error("Failed to persist backend state.", error);
+    // Writes require an authenticated user (per Firestore rules), so only
+    // persist when someone is signed in. This also avoids overwriting cloud
+    // data from a logged-out browsing session.
+    if (isBootstrapping || !isBackendAvailable || !authEmail) return;
+    // currentUser is auth-derived, so the shared snapshot stores no session id.
+    void persistAppState({ store, currentUserId: null }).catch((error) => {
+      console.error("Failed to persist Firebase state.", error);
       toast.error("Failed to sync changes", {
         description:
-          "Your latest updates were not saved to the backend.",
+          "Your latest updates were not saved to the cloud.",
       });
     });
   }, [
     store,
-    currentUserId,
+    authEmail,
     isBootstrapping,
     isBackendAvailable,
   ]);
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const userId = await authService.login({ email, password });
-      try {
-        const snapshot = await fetchAppState();
-        seedCounters(snapshot.store);
-        setStore(syncMemberCounts(snapshot.store));
-        setCurrentUserId(userId);
-        setIsBackendAvailable(true);
-      } catch (error) {
-        console.error("Backend state unavailable after login.", error);
-        const demoStore = createDemoStore();
-        demoStore.currentUserId = userId;
-        setStore(demoStore);
-        setCurrentUserId(userId);
-        setIsBackendAvailable(false);
-      }
+      const authedEmail = await authService.login({ email, password });
+      setAuthEmail(authedEmail);
     },
     [],
   );
@@ -160,29 +162,39 @@ export function Providers({
       department: string;
       password: string;
     }) => {
-      const userId = await authService.register(payload);
-      const snapshot = await fetchAppState();
-      seedCounters(snapshot.store);
-      setStore(syncMemberCounts(snapshot.store));
-      setCurrentUserId(userId);
+      await authService.register(payload);
+      const email = payload.email.trim().toLowerCase();
+      setStore((s) => {
+        const existing = s.users.find(
+          (u) => u.email.toLowerCase() === email,
+        );
+        if (existing) return s;
+        const { state } = registerUser(s, {
+          name: payload.name,
+          email,
+          student_id: payload.student_id,
+          department: payload.department,
+        });
+        return state;
+      });
+      setAuthEmail(email);
     },
     [],
   );
 
   const switchRole = useCallback((userId: string) => {
-    setCurrentUserId(userId);
-    setStore((s) => ({ ...s, currentUserId: userId }));
+    const user = storeRef.current.users.find((u) => u.id === userId);
+    setAuthEmail(user?.email ?? null);
   }, []);
 
   const logout = useCallback(() => {
     void authService.logout().catch((error) => {
-      console.error("Failed to log out on backend.", error);
+      console.error("Failed to log out.", error);
       toast.error("Logout failed", {
-        description: "Could not close your backend session.",
+        description: "Could not close your session.",
       });
     });
-    setCurrentUserId(null);
-    setStore((s) => ({ ...s, currentUserId: "" }));
+    setAuthEmail(null);
   }, []);
 
   const doRegister = useCallback(
@@ -270,77 +282,29 @@ export function Providers({
   );
 
   const doRemoveMember = useCallback((membershipId: string) => {
-    // Read current values via ref to avoid stale closure.
     const mem = storeRef.current.memberships.find((m) => m.id === membershipId);
-    const clubId = mem?.club_id ?? "";
     const userName = storeRef.current.users.find((u) => u.id === mem?.user_id)?.name ?? "Member";
-
-    // Optimistic local update.
     setStore((s) => removeMember(s, membershipId));
     toast.info("Member removed", { description: `${userName} removed from club.` });
-
-    // Persist to DB — count is re-derived from actual rows on the backend.
-    if (clubId) {
-      void deleteMemberApi(clubId, membershipId).catch(() => {
-        toast.error("Failed to sync removal with server");
-      });
-    }
   }, []);
 
   const doAssignRoles = useCallback((clubId: string) => {
-    void assignClubRolesApi(clubId)
-      .then((result) => {
-        // Replace local membership roles with authoritative DB values.
-        setStore((s) => {
-          const roleMap = new Map(result.members.map((m) => [m.id, m]));
-          return {
-            ...s,
-            memberships: s.memberships.map((existing) => {
-              const api = roleMap.get(existing.id);
-              return api
-                ? { ...existing, role: api.role ?? existing.role, committee_type: api.committee_type ?? existing.committee_type }
-                : existing;
-            }),
-          };
-        });
-        toast.success("Roles assigned", {
-          description: "Executive and sub-committee roles have been randomly assigned.",
-        });
-      })
-      .catch(() => {
-        // Fallback: local algorithm when backend is unreachable.
-        setStore((s) => assignClubRoles(s, clubId));
-        toast.success("Roles assigned", {
-          description: "Executive and sub-committee roles have been randomly assigned.",
-        });
-      });
+    setStore((s) => assignClubRoles(s, clubId));
+    toast.success("Roles assigned", {
+      description:
+        "Executive and sub-committee roles have been randomly assigned.",
+    });
   }, []);
 
   const doUpdateMemberRole = useCallback(
     (membershipId: string, newRole: ClubRole) => {
-      const mem = storeRef.current.memberships.find((m) => m.id === membershipId);
-      const clubId = mem?.club_id ?? "";
-
-      // Optimistic local update.
-      setStore((s) => {
-        try {
-          return updateMemberRole(s, membershipId, newRole);
-        } catch {
-          return s;
-        }
-      });
-
-      // Persist to DB; backend enforces exec-role limits.
-      if (clubId) {
-        void updateMemberRoleApi(clubId, membershipId, newRole)
-          .then(() => toast.success("Role updated"))
-          .catch((err) => {
-            toast.error("Role update failed", {
-              description: err instanceof Error ? err.message : undefined,
-            });
-          });
-      } else {
+      try {
+        setStore((s) => updateMemberRole(s, membershipId, newRole));
         toast.success("Role updated");
+      } catch (err) {
+        toast.error("Role update failed", {
+          description: err instanceof Error ? err.message : undefined,
+        });
       }
     },
     [],

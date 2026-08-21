@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// Firestore security rules for IUB Event Management.
+//
+// Data model: the whole app state lives in a single document `appState/main`.
+// - Reads are public (the app lets logged-out visitors browse events/clubs).
+// - Writes require an authenticated @iub.edu.bd user.
+//
+// NOTE: because the client stores everything in one document and overwrites the
+// whole snapshot on each change, any authenticated @iub.edu.bd user can modify
+// all data. This is acceptable for a campus prototype but is NOT suitable for
+// untrusted multi-tenant production. To harden, split data into per-entity
+// collections and add per-field / per-role rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isIubUser() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.matches('.*@iub[.]edu[.]bd$');
+    }
+
+    match /appState/{docId} {
+      allow read: if true;
+      allow write: if isIubUser();
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -33,17 +33,6 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  server: {
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:8787",
-        changeOrigin: true,
-        // Strip the /api prefix before forwarding to the backend server,
-        // whose routes are registered without that prefix.
-        rewrite: (path) => path.replace(/^\/api/, ""),
-      },
-    },
-  },
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ["**/*.svg", "**/*.csv"],
