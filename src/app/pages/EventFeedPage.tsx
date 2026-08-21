@@ -3,9 +3,8 @@ import {
 } from "react";
 
 import {
-  CalendarDays, Search
+  CalendarDays
 } from "lucide-react";
-import { Input } from "../components/ui/input";
 import {
   Select,
   SelectContent,
@@ -16,6 +15,8 @@ import {
 import { useData } from "../context/DataContext";
 import { EventCard } from "../components/EventCard";
 import { EmptyState } from "../components/EmptyState";
+import { SearchInput } from "../components/SearchInput";
+
 
 export function EventFeedPage() {
   const { store } = useData();
@@ -65,15 +66,14 @@ export function EventFeedPage() {
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search events..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-card border-border"
-          />
-        </div>
+        <SearchInput
+          className="flex-1 min-w-[220px]"
+          label="EVENTS"
+          placeholder="Search events..."
+          value={search}
+          onChange={setSearch}
+          ariaLabel="Search events"
+        />
         <Select
           value={clubFilter}
           onValueChange={setClubFilter}

@@ -1,18 +1,14 @@
 import {
-  Link
-} from "react-router";
-
-import {
   CalendarDays,
   Users, BookOpen, BadgeCheck
 } from "lucide-react";
-import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import {
   Card, CardDescription, CardHeader,
   CardTitle
 } from "../components/ui/card";
 import { useAuth } from "../context/AuthContext";
+import { ComicButton } from "../components/ComicButton";
 
 export function LandingPage() {
   const { currentUser } = useAuth();
@@ -31,14 +27,21 @@ export function LandingPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" asChild>
-              <Link to="/login">Login</Link>
-            </Button>
-            <Button asChild>
-              <Link to={currentUser ? "/dashboard" : "/register"}>
-                {currentUser ? "Open Dashboard" : "Get Started"}
-              </Link>
-            </Button>
+            <ComicButton
+              to="/login"
+              className="scale-75 origin-right"
+              innerColor="#ffffff"
+              ariaLabel="Login"
+            >
+              Login
+            </ComicButton>
+            <ComicButton
+              to={currentUser ? "/dashboard" : "/register"}
+              className="scale-75 origin-right"
+              ariaLabel={currentUser ? "Open Dashboard" : "Get Started"}
+            >
+              {currentUser ? "Dashboard" : "Get Started"}
+            </ComicButton>
           </div>
         </div>
       </header>
@@ -56,15 +59,16 @@ export function LandingPage() {
             Discover events, join clubs, track registrations, and coordinate
             organizers through a single campus platform.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild>
-              <Link to={currentUser ? "/dashboard" : "/register"}>
-                {currentUser ? "Go to Dashboard" : "Create Account"}
-              </Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/login">Sign in</Link>
-            </Button>
+          <div className="mt-8 flex flex-wrap gap-4">
+            <ComicButton
+              to={currentUser ? "/dashboard" : "/register"}
+              ariaLabel={currentUser ? "Go to Dashboard" : "Create Account"}
+            >
+              {currentUser ? "Go to Dashboard" : "Create Account"}
+            </ComicButton>
+            <ComicButton to="/login" innerColor="#ffffff" ariaLabel="Sign in">
+              Sign in
+            </ComicButton>
           </div>
         </section>
 

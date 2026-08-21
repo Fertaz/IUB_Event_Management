@@ -16,8 +16,10 @@ import { Label } from "../components/ui/label";
 import { useAuth } from "../context/AuthContext";
 import { AuthBrandPanel } from "../components/AuthBrandPanel";
 import { GoogleIcon } from "../components/GoogleIcon";
+import { ComicButton } from "../components/ComicButton";
 
 export function LoginPage() {
+
   const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -106,13 +108,15 @@ export function LoginPage() {
                 required
               />
             </div>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-primary hover:bg-primary/90"
-            >
-              {isSubmitting ? "Signing in..." : "Login"}
-            </Button>
+            <div className="flex justify-center">
+              <ComicButton
+                type="submit"
+                disabled={isSubmitting}
+                ariaLabel="Login"
+              >
+                {isSubmitting ? "Signing in..." : "Login"}
+              </ComicButton>
+            </div>
           </form>
 
           <div className="my-6 flex items-center gap-3">

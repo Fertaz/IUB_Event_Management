@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-
+import { ComicButton } from "../components/ComicButton";
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -59,12 +59,11 @@ export function ForgotPasswordPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <Button
-              type="submit"
-              className="w-full bg-primary hover:bg-primary/90"
-            >
-              Send reset OTP
-            </Button>
+            <div className="flex justify-center">
+              <ComicButton type="submit" ariaLabel="Send reset OTP">
+                Send reset OTP
+              </ComicButton>
+            </div>
           </form>
         ) : (
           <div className="space-y-4">

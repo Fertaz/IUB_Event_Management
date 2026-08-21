@@ -58,7 +58,7 @@ import { getInitials, roleBadgeClass } from "../lib/uiHelpers";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { EmptyState } from "../components/EmptyState";
-import { Spinner } from "../components/Spinner";
+import { HamsterLoader } from "../components/Spinner";
 
 const CLUB_ROLES: ClubRole[] = [
   "President",
@@ -434,8 +434,9 @@ export function MemberRosterPage() {
       </Dialog>
 
       {loading ? (
-        <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-          <Spinner /> Loading members…
+        <div className="flex flex-col items-center justify-center gap-3 py-10 text-sm text-muted-foreground">
+          <HamsterLoader label="Loading members" fontSize={7} />
+          Loading members…
         </div>
       ) : members.length === 0 ? (
         <EmptyState icon={Users} title="No members yet" description="" />

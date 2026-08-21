@@ -5,13 +5,12 @@ import {
 import { format, parseISO } from "date-fns";
 import {
   CalendarDays,
-  Users, Search, Ticket,
+  Users, Ticket,
   AlertCircle,
   CheckCircle2,
   XCircle, Trash2, BadgeCheck, Globe
 } from "lucide-react";
 import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import {
   Dialog,
@@ -55,6 +54,7 @@ import { getInitials, roleBadge } from "../lib/uiHelpers";
 import { useData } from "../context/DataContext";
 import { StatCard } from "../components/StatCard";
 import { EmptyState } from "../components/EmptyState";
+import { SearchInput } from "../components/SearchInput";
 
 export function SuperAdminPage() {
   const {
@@ -166,13 +166,14 @@ export function SuperAdminPage() {
         </div>
       )}
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
+      <div>
+        <SearchInput
+          className="w-full"
+          label="ADMIN"
           placeholder="Search events, clubs, or users..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 bg-card border-border"
+          onChange={setSearch}
+          ariaLabel="Search events, clubs, or users"
         />
       </div>
 
