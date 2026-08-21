@@ -141,6 +141,7 @@ import type {
   StoreState,
   User,
   UserRole,
+  ClubRole,
   Club,
   Event,
   Notification,
@@ -153,6 +154,8 @@ import {
   applyToClub,
   reviewMembership,
   removeMember,
+  assignClubRoles,
+  updateMemberRole,
   createEvent,
   updateEvent,
   cancelEvent,
@@ -251,6 +254,8 @@ interface DataContextValue {
     action: "approved" | "rejected",
   ) => void;
   doRemoveMember: (membershipId: string) => void;
+  doAssignRoles: (clubId: string) => void;
+  doUpdateMemberRole: (membershipId: string, newRole: ClubRole) => void;
   doCreateEvent: (
     data: Omit<
       Event,
@@ -515,6 +520,34 @@ function Providers({
     });
   }, []);
 
+  const doAssignRoles = useCallback((clubId: string) => {
+    setStore((s) => {
+      const next = assignClubRoles(s, clubId);
+      toast.success("Roles assigned", {
+        description: "Executive and sub-committee roles have been randomly assigned.",
+      });
+      return next;
+    });
+  }, []);
+
+  const doUpdateMemberRole = useCallback(
+    (membershipId: string, newRole: ClubRole) => {
+      setStore((s) => {
+        try {
+          const next = updateMemberRole(s, membershipId, newRole);
+          toast.success("Role updated");
+          return next;
+        } catch (err) {
+          toast.error("Role update failed", {
+            description: err instanceof Error ? err.message : undefined,
+          });
+          return s;
+        }
+      });
+    },
+    [],
+  );
+
   const doCreateEvent = useCallback(
     (
       data: Omit<
@@ -725,6 +758,8 @@ function Providers({
     doApplyClub,
     doReviewMembership,
     doRemoveMember,
+    doAssignRoles,
+    doUpdateMemberRole,
     doCreateEvent,
     doUpdateEvent,
     doCancelEvent,

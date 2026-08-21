@@ -9,6 +9,12 @@ import {
   saveSnapshot,
   verifyPassword,
   writeCurrentUserId,
+  listClubMembers,
+  getClubMemberCount,
+  syncAllClubMemberCounts,
+  updateMembershipRole,
+  assignRolesForClub,
+  deleteMembership,
 } from "./db.mjs";
 
 const db = createDatabase();
@@ -20,7 +26,7 @@ function json(res, status, payload) {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
   });
   res.end(body);
 }
@@ -62,7 +68,7 @@ async function handleRequest(req, res) {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     });
     res.end();
     return;
@@ -137,7 +143,87 @@ async function handleRequest(req, res) {
         return;
       }
       saveSnapshot(db, body);
+      // Keep club member_count in sync after every full state write.
+      syncAllClubMemberCounts(db);
       json(res, 200, { ok: true });
+      return;
+    }
+
+    // ── Member CRUD ──────────────────────────────────────────────────────────
+
+    // GET /clubs/:clubId/members
+    // Returns { clubId, totalCount, members[] } — single source of truth for
+    // both the dashboard stat and the member list.
+    const membersMatch = url.pathname.match(/^\/clubs\/([^/]+)\/members$/);
+    if (req.method === "GET" && membersMatch) {
+      const clubId = membersMatch[1];
+      const members = listClubMembers(db, clubId);
+      const totalCount = getClubMemberCount(db, clubId);
+      json(res, 200, { clubId, totalCount, members });
+      return;
+    }
+
+    // PUT /clubs/:clubId/members/:membershipId/role
+    // Body: { role: ClubRole }
+    const memberRoleMatch = url.pathname.match(
+      /^\/clubs\/([^/]+)\/members\/([^/]+)\/role$/,
+    );
+    if (req.method === "PUT" && memberRoleMatch) {
+      const membershipId = memberRoleMatch[2];
+      const body = (await readBody(req)) || {};
+      const role = String(body.role || "").trim();
+      if (!role) {
+        json(res, 400, { message: "role is required" });
+        return;
+      }
+      try {
+        updateMembershipRole(db, membershipId, role);
+        syncAllClubMemberCounts(db);
+        json(res, 200, { ok: true });
+      } catch (err) {
+        json(res, 409, {
+          message: err instanceof Error ? err.message : "Role update failed",
+        });
+      }
+      return;
+    }
+
+    // POST /clubs/:clubId/members/assign-roles
+    // Randomly assigns exec + sub-committee roles to all approved members.
+    const assignMatch = url.pathname.match(
+      /^\/clubs\/([^/]+)\/members\/assign-roles$/,
+    );
+    if (req.method === "POST" && assignMatch) {
+      const clubId = assignMatch[1];
+      try {
+        assignRolesForClub(db, clubId);
+        const members = listClubMembers(db, clubId);
+        const totalCount = getClubMemberCount(db, clubId);
+        json(res, 200, { clubId, totalCount, members });
+      } catch (err) {
+        json(res, 400, {
+          message: err instanceof Error ? err.message : "Role assignment failed",
+        });
+      }
+      return;
+    }
+
+    // DELETE /clubs/:clubId/members/:membershipId
+    const memberDeleteMatch = url.pathname.match(
+      /^\/clubs\/([^/]+)\/members\/([^/]+)$/,
+    );
+    if (req.method === "DELETE" && memberDeleteMatch) {
+      const membershipId = memberDeleteMatch[2];
+      try {
+        deleteMembership(db, membershipId);
+        const clubId = memberDeleteMatch[1];
+        const totalCount = getClubMemberCount(db, clubId);
+        json(res, 200, { ok: true, totalCount });
+      } catch (err) {
+        json(res, 404, {
+          message: err instanceof Error ? err.message : "Delete failed",
+        });
+      }
       return;
     }
 
