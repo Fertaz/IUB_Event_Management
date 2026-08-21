@@ -15,6 +15,8 @@ import {
   useParams,
   useLocation,
 } from "react-router";
+
+const ROUTER_BASENAME = import.meta.env.BASE_URL.replace(/\/$/, "") || "/";
 import { toast, Toaster } from "sonner";
 import { format, parseISO, isPast } from "date-fns";
 import {
@@ -6152,11 +6154,9 @@ function SuperAdminPage() {
 // ─── App Root ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const routerBase = import.meta.env.BASE_URL.replace(/\/$/, "") || "/";
-
   return (
     <Providers>
-      <BrowserRouter basename={routerBase}>
+      <BrowserRouter basename={ROUTER_BASENAME}>
         <Toaster
           richColors
           position="top-right"
