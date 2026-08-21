@@ -6153,7 +6153,7 @@ function SuperAdminPage() {
 // ─── App Root ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const routerBase = import.meta.env.BASE_URL.replace(/\/$/, "") || "/";
+  const routerBase = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "") || "/";
 
   return (
     <Providers>
