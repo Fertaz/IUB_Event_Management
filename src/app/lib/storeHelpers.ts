@@ -1,5 +1,5 @@
 import type { StoreState } from "./store";
-import { initialState, seedCounters } from "./store";
+import { initialState, seedCounters, syncMemberCounts } from "./store";
 
 function createEmptyStore(): StoreState {
   return {
@@ -38,7 +38,7 @@ function createDemoStore(): StoreState {
   const next = cloneStore(initialState);
   next.currentUserId = "";
   seedCounters(next);
-  return next;
+  return syncMemberCounts(next);
 }
 
 export { createEmptyStore, cloneStore, createDemoStore };

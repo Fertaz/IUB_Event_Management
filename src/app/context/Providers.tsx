@@ -32,6 +32,7 @@ import {
   reviewRoleRequest,
   changeUserRole,
   seedCounters,
+  syncMemberCounts,
   setCheckIn,
   toggleEventException,
   sendDigest,
@@ -88,7 +89,7 @@ export function Providers({
         const snapshot = await fetchAppState();
         if (cancelled) return;
         seedCounters(snapshot.store);
-        setStore(snapshot.store);
+        setStore(syncMemberCounts(snapshot.store));
         setCurrentUserId(snapshot.currentUserId);
         setIsBackendAvailable(true);
       } catch (error) {
@@ -136,7 +137,7 @@ export function Providers({
       try {
         const snapshot = await fetchAppState();
         seedCounters(snapshot.store);
-        setStore(snapshot.store);
+        setStore(syncMemberCounts(snapshot.store));
         setCurrentUserId(userId);
         setIsBackendAvailable(true);
       } catch (error) {
@@ -162,7 +163,7 @@ export function Providers({
       const userId = await authService.register(payload);
       const snapshot = await fetchAppState();
       seedCounters(snapshot.store);
-      setStore(snapshot.store);
+      setStore(syncMemberCounts(snapshot.store));
       setCurrentUserId(userId);
     },
     [],
