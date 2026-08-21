@@ -38,6 +38,9 @@ export default defineConfig({
       "/api": {
         target: "http://127.0.0.1:8787",
         changeOrigin: true,
+        // Strip the /api prefix before forwarding to the backend server,
+        // whose routes are registered without that prefix.
+        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },

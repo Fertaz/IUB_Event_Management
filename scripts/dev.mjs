@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const node = process.execPath;
 
-const backend = spawn(node, [path.join(root, "server", "index.mjs")], {
+const backend = spawn(node, ["--experimental-strip-types", path.join(root, "server", "index.mjs")], {
   cwd: root,
   stdio: "inherit",
 });
