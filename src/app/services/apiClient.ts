@@ -1,41 +1,75 @@
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-    this.name = 'ApiError';
+  constructor(
+    public status: number,
+    public details?: unknown,
+    message?: string,
+  ) {
+    super(message ?? `Request failed with status ${status}`);
+    this.name = "ApiError";
   }
 }
 
-/**
- * A basic API client wrapper around fetch.
- * Automatically adds Authorization headers if a token exists in localStorage.
- */
+const AUTH_TOKEN_KEY = "auth_token";
+const API_BASE_URL =
+  typeof window !== "undefined" && window.__API_BASE_URL__
+    ? window.__API_BASE_URL__
+    : "/api";
+
+declare global {
+  interface Window {
+    __API_BASE_URL__?: string;
+  }
+}
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string | null): void {
+  if (token) {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+    return;
+  }
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
 export async function apiClient<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
-  const token = localStorage.getItem('auth_token');
-  const headers = new Headers(options.headers || {});
-  
+  const url = `${API_BASE_URL}${endpoint}`;
+  const headers = new Headers(options.headers ?? {});
+  const token = getAuthToken();
+
   if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
-  
-  if (!headers.has('Content-Type') && options.body && typeof options.body === 'string') {
-    headers.set('Content-Type', 'application/json');
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
-  // NOTE: This currently simulates an API call since there's no real backend yet.
-  // In a real implementation, you would use:
-  // const response = await fetch(`/api${endpoint}`, { ...options, headers });
-  
-  // SIMULATED BACKEND DELAY
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Throw for simulated failures
-  if (endpoint.includes('error')) {
-    throw new ApiError(500, 'Simulated API Error');
+  if (options.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
 
-  // Simulate returning some generic JSON
-  return {} as T;
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
+
+  const contentType = response.headers.get("Content-Type") ?? "";
+  const isJson = contentType.includes("application/json");
+  const payload = isJson ? await response.json() : await response.text();
+
+  if (!response.ok) {
+    const message =
+      isJson &&
+      typeof payload === "object" &&
+      payload !== null &&
+      "message" in payload &&
+      typeof (payload as { message?: unknown }).message === "string"
+        ? (payload as { message: string }).message
+        : response.statusText || "Request failed";
+    throw new ApiError(response.status, payload, message);
+  }
+
+  return payload as T;
 }

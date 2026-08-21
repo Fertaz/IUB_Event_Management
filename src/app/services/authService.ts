@@ -1,73 +1,48 @@
-import { apiClient } from './apiClient';
+import { apiClient, setAuthToken } from "@/app/services/apiClient";
 
 export interface LoginCredentials {
   email: string;
-  password?: string; // Optional for now during transition
+  password: string;
 }
 
-export interface AuthResponse {
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  student_id: string;
+  department: string;
+  password: string;
+}
+
+interface AuthResult {
   token: string;
-  user: {
-    id: string;
-    email: string;
-    role: string;
-  };
+  userId: string;
 }
 
 class AuthService {
-  private readonly TOKEN_KEY = 'auth_token';
-  private readonly USER_KEY = 'auth_user';
+  async login(credentials: LoginCredentials): Promise<string> {
+    const result = await apiClient<AuthResult>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(credentials),
+    });
+    setAuthToken(result.token);
+    return result.userId;
+  }
 
-  async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    // In a real app, you would make a POST request to your backend:
-    // return apiClient<AuthResponse>('/auth/login', {
-    //   method: 'POST',
-    //   body: JSON.stringify(credentials)
-    // });
-    
-    // SIMULATED AUTH
-    await apiClient('/auth/login');
-    
-    if (credentials.email === 'error@example.com') {
-      throw new Error('Invalid credentials');
-    }
-
-    const mockResponse: AuthResponse = {
-      token: 'mock-jwt-token-12345',
-      user: {
-        id: 'user_1', // Temporarily hardcoded for simulation
-        email: credentials.email,
-        role: 'student'
-      }
-    };
-
-    this.setSession(mockResponse);
-    return mockResponse;
+  async register(payload: RegisterPayload): Promise<string> {
+    const result = await apiClient<AuthResult>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    setAuthToken(result.token);
+    return result.userId;
   }
 
   async logout(): Promise<void> {
-    // await apiClient('/auth/logout', { method: 'POST' });
-    localStorage.removeItem(this.TOKEN_KEY);
-    localStorage.removeItem(this.USER_KEY);
-  }
-
-  isAuthenticated(): boolean {
-    return !!localStorage.getItem(this.TOKEN_KEY);
-  }
-
-  getCurrentUser() {
-    const userStr = localStorage.getItem(this.USER_KEY);
-    if (!userStr) return null;
     try {
-      return JSON.parse(userStr);
-    } catch {
-      return null;
+      await apiClient<void>("/auth/logout", { method: "POST" });
+    } finally {
+      setAuthToken(null);
     }
-  }
-
-  private setSession(response: AuthResponse) {
-    localStorage.setItem(this.TOKEN_KEY, response.token);
-    localStorage.setItem(this.USER_KEY, JSON.stringify(response.user));
   }
 }
 

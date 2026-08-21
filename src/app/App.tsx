@@ -24,7 +24,6 @@ import {
   Bell,
   User as UserIcon,
   Menu,
-  X,
   ChevronRight,
   Search,
   Plus,
@@ -54,9 +53,9 @@ import {
   Repeat,
   MailCheck,
 } from "lucide-react";
-import { Button } from "@/app/components/ui/button";
-import { Input } from "@/app/components/ui/input";
-import { Badge } from "@/app/components/ui/badge";
+import { Button } from "./components/ui/button";
+import { Input } from "./components/ui/input";
+import { Badge } from "./components/ui/badge";
 import {
   Card,
   CardContent,
@@ -64,7 +63,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/app/components/ui/card";
+} from "./components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -73,7 +72,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/app/components/ui/dialog";
+} from "./components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -81,34 +80,34 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/app/components/ui/dropdown-menu";
+} from "./components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/app/components/ui/select";
+} from "./components/ui/select";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@/app/components/ui/tabs";
+} from "./components/ui/tabs";
 import {
   Avatar,
   AvatarFallback,
-} from "@/app/components/ui/avatar";
-import { Separator } from "@/app/components/ui/separator";
-import { Textarea } from "@/app/components/ui/textarea";
-import { Label } from "@/app/components/ui/label";
+} from "./components/ui/avatar";
+import { Separator } from "./components/ui/separator";
+import { Textarea } from "./components/ui/textarea";
+import { Label } from "./components/ui/label";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from "@/app/components/ui/sheet";
+} from "./components/ui/sheet";
 import {
   Table,
   TableBody,
@@ -116,8 +115,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/app/components/ui/table";
-import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+} from "./components/ui/table";
+import { ImageWithFallback } from "./components/figma/ImageWithFallback";
 import {
   downloadICS,
   googleCalendarUrl,
@@ -126,7 +125,7 @@ import {
   parseCheckInCode,
   getOccurrences,
   recurrenceLabel,
-} from "@/app/lib/eventUtils";
+} from "./lib/eventUtils";
 import { QRCodeSVG } from "qrcode.react";
 import {
   BarChart,
@@ -143,11 +142,9 @@ import type {
   UserRole,
   Club,
   Event,
-  Registration,
-  Membership,
   Notification,
   RoleRequest,
-} from "@/app/lib/store";
+} from "./lib/store";
 import {
   initialState,
   registerForEvent,
@@ -170,77 +167,39 @@ import {
   setCheckIn,
   toggleEventException,
   sendDigest,
-} from "@/app/lib/store";
+} from "./lib/store";
+import { authService } from "./services/authService";
+import {
+  fetchAppState,
+  persistAppState,
+} from "./services/stateService";
 
-// ─── Persistence ──────────────────────────────────────────────────────────────
-// The in-memory store is mirrored to localStorage so demo data survives reloads.
-// Bump the version suffix whenever the data shape changes to discard stale state.
-const STORE_KEY = "iub_hub_store_v2";
-const AUTH_KEY = "iub_hub_auth_v2";
-const PASSWORDS_KEY = "iub_hub_passwords_v1";
-
-type PasswordStore = Record<string, string>;
-
-function loadStore(): StoreState {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as StoreState;
-      seedCounters(parsed);
-      return parsed;
-    }
-  } catch (error) {
-    console.warn("Failed to load persisted store, using seed data.", error);
-  }
-  return initialState;
-}
-
-function loadAuth(): string | null {
-  try {
-    return localStorage.getItem(AUTH_KEY) || null;
-  } catch (error) {
-    console.warn("Failed to load persisted auth session.", error);
-    return null;
-  }
-}
-
-function loadPasswords(): PasswordStore {
-  try {
-    const raw = localStorage.getItem(PASSWORDS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed as PasswordStore;
-  } catch (error) {
-    console.warn("Failed to load saved account passwords.", error);
-    return {};
-  }
-}
-
-function savePasswords(passwords: PasswordStore): void {
-  try {
-    localStorage.setItem(PASSWORDS_KEY, JSON.stringify(passwords));
-  } catch (error) {
-    console.warn("Failed to save account password.", error);
-  }
-}
-
-function setPassword(userId: string, password: string): void {
-  const passwords = loadPasswords();
-  passwords[userId] = password;
-  savePasswords(passwords);
-}
-
-function verifyPassword(user: User, password: string): boolean {
-  const passwords = loadPasswords();
-  const expected = passwords[user.id] ?? user.student_id;
-  return expected === password;
+function createEmptyStore(): StoreState {
+  return {
+    ...initialState,
+    users: [],
+    clubs: [],
+    events: [],
+    registrations: [],
+    memberships: [],
+    notifications: [],
+    roleRequests: [],
+    currentUserId: "",
+  };
 }
 
 // ─── Auth Context ─────────────────────────────────────────────────────────────
 
 interface AuthContextValue {
   currentUser: User | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (payload: {
+    name: string;
+    email: string;
+    student_id: string;
+    department: string;
+    password: string;
+  }) => Promise<void>;
   switchRole: (userId: string) => void;
   logout: () => void;
   isStudent: boolean;
@@ -316,32 +275,81 @@ function Providers({
 }: {
   children: React.ReactNode;
 }) {
-  const [store, setStore] = useState<StoreState>(loadStore);
+  const [store, setStore] = useState<StoreState>(createEmptyStore);
   const [currentUserId, setCurrentUserId] = useState<
     string | null
-  >(loadAuth);
+  >(null);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   const currentUser =
     store.users.find((u) => u.id === currentUserId) ?? null;
 
-  // Persist store + session to localStorage on every change.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(store));
-    } catch (error) {
-      console.warn("Failed to persist store to localStorage.", error);
+    let cancelled = false;
+
+    async function bootstrap() {
+      try {
+        const snapshot = await fetchAppState();
+        if (cancelled) return;
+        seedCounters(snapshot.store);
+        setStore(snapshot.store);
+        setCurrentUserId(snapshot.currentUserId);
+      } catch (error) {
+        console.error("Failed to load backend state.", error);
+        toast.error("Could not load backend state", {
+          description:
+            "Check VITE_API_BASE_URL and backend availability.",
+        });
+      } finally {
+        if (!cancelled) setIsBootstrapping(false);
+      }
     }
-  }, [store]);
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
-    try {
-      if (currentUserId)
-        localStorage.setItem(AUTH_KEY, currentUserId);
-      else localStorage.removeItem(AUTH_KEY);
-    } catch (error) {
-      console.warn("Failed to persist auth session.", error);
-    }
-  }, [currentUserId]);
+    if (isBootstrapping) return;
+    void persistAppState({ store, currentUserId }).catch((error) => {
+      console.error("Failed to persist backend state.", error);
+      toast.error("Failed to sync changes", {
+        description:
+          "Your latest updates were not saved to the backend.",
+      });
+    });
+  }, [store, currentUserId, isBootstrapping]);
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const userId = await authService.login({ email, password });
+      const snapshot = await fetchAppState();
+      seedCounters(snapshot.store);
+      setStore(snapshot.store);
+      setCurrentUserId(userId);
+    },
+    [],
+  );
+
+  const register = useCallback(
+    async (payload: {
+      name: string;
+      email: string;
+      student_id: string;
+      department: string;
+      password: string;
+    }) => {
+      const userId = await authService.register(payload);
+      const snapshot = await fetchAppState();
+      seedCounters(snapshot.store);
+      setStore(snapshot.store);
+      setCurrentUserId(userId);
+    },
+    [],
+  );
 
   const switchRole = useCallback((userId: string) => {
     setCurrentUserId(userId);
@@ -349,7 +357,14 @@ function Providers({
   }, []);
 
   const logout = useCallback(() => {
+    void authService.logout().catch((error) => {
+      console.error("Failed to log out on backend.", error);
+      toast.error("Logout failed", {
+        description: "Could not close your backend session.",
+      });
+    });
     setCurrentUserId(null);
+    setStore((s) => ({ ...s, currentUserId: "" }));
   }, []);
 
   const doRegister = useCallback(
@@ -634,12 +649,24 @@ function Providers({
 
   const authValue: AuthContextValue = {
     currentUser,
+    login,
+    register,
     switchRole,
     logout,
     isStudent: currentUser?.role === "student",
     isClubAdmin: currentUser?.role === "club_admin",
     isSuperAdmin: currentUser?.role === "super_admin",
   };
+
+  if (isBootstrapping) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">
+          Loading campus hub...
+        </p>
+      </div>
+    );
+  }
 
   const dataValue: DataContextValue = {
     store,
@@ -1188,10 +1215,6 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
     useAuth();
   const { store } = useData();
 
-  const unread = store.notifications.filter(
-    (n) => n.user_id === currentUser?.id && !n.is_read,
-  ).length;
-
   const myClub = isClubAdmin
     ? store.clubs.find(
         (c) => c.admin_user_id === currentUser?.id,
@@ -1582,13 +1605,13 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 function LoginPage() {
-  const { switchRole } = useAuth();
-  const { store } = useData();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail.endsWith("@iub.edu.bd")) {
@@ -1597,24 +1620,19 @@ function LoginPage() {
       });
       return;
     }
-    const account = store.users.find(
-      (u) => u.email.toLowerCase() === normalizedEmail,
-    );
-    if (!account) {
-      toast.error("Account not found", {
+    setIsSubmitting(true);
+    try {
+      await login(normalizedEmail, password);
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Login failed.", error);
+      toast.error("Login failed", {
         description:
-          "No account exists for this email. Please sign up first.",
+          "Could not sign you in. Please verify your credentials.",
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-    if (!verifyPassword(account, password)) {
-      toast.error("Incorrect password", {
-        description: "Please check your password and try again.",
-      });
-      return;
-    }
-    switchRole(account.id);
-    navigate("/dashboard");
   }
 
   return (
@@ -1677,9 +1695,10 @@ function LoginPage() {
             </div>
             <Button
               type="submit"
+              disabled={isSubmitting}
               className="w-full bg-primary hover:bg-primary/90"
             >
-              Login
+              {isSubmitting ? "Signing in..." : "Login"}
             </Button>
           </form>
 
@@ -1720,8 +1739,7 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const { doRegisterUser, store } = useData();
-  const { switchRole } = useAuth();
+  const { register } = useAuth();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -1729,8 +1747,9 @@ function RegisterPage() {
     department: "",
     password: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const normalizedEmail = form.email.trim().toLowerCase();
     if (!normalizedEmail.endsWith("@iub.edu.bd")) {
@@ -1740,36 +1759,35 @@ function RegisterPage() {
       });
       return;
     }
-    if (
-      store.users.some(
-        (u) => u.email.toLowerCase() === normalizedEmail,
-      )
-    ) {
-      toast.error("Email already registered", {
-        description:
-          "An account already exists with this email. Please sign in instead.",
-      });
-      return;
-    }
     if (form.password.length < 8) {
       toast.error("Weak password", {
         description: "Password must be at least 8 characters.",
       });
       return;
     }
-    const userId = doRegisterUser({
-      name: form.name,
-      email: normalizedEmail,
-      student_id: form.studentId,
-      department: form.department,
-    });
-    setPassword(userId, form.password);
-    switchRole(userId);
-    toast.success("Account created!", {
-      description:
-        "Welcome to IUB Campus Hub. You're signed in as a student.",
-    });
-    navigate("/dashboard");
+    setIsSubmitting(true);
+    try {
+      await register({
+        name: form.name,
+        email: normalizedEmail,
+        student_id: form.studentId,
+        department: form.department,
+        password: form.password,
+      });
+      toast.success("Account created!", {
+        description:
+          "Welcome to IUB Campus Hub. You're signed in as a student.",
+      });
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Registration failed.", error);
+      toast.error("Registration failed", {
+        description:
+          "Could not create the account. Try a different email.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -1881,9 +1899,12 @@ function RegisterPage() {
             </div>
             <Button
               type="submit"
+              disabled={isSubmitting}
               className="w-full bg-primary hover:bg-primary/90"
             >
-              Create Account
+              {isSubmitting
+                ? "Creating account..."
+                : "Create Account"}
             </Button>
           </form>
 
@@ -5858,8 +5879,6 @@ function SuperAdminPage() {
 }
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
-
-import LandingPage from "./pages/LandingPage";
 
 export default function App() {
   return (
