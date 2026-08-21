@@ -116,6 +116,8 @@ import type {
   Notification,
   RoleRequest,
 } from "@/app/lib/store";
+import CheckinScanner from "@/app/components/ui/CheckinScanner";
+import QrView from "@/app/components/ui/QrView";
 import {
   initialState,
   registerForEvent,
@@ -2624,6 +2626,24 @@ function EventManagePage() {
                     variant="ghost"
                     size="icon"
                     className="size-8"
+                    onClick={() => navigate(`/admin/events/${e.id}/qr`)}
+                    title="Generate QR"
+                  >
+                    <CalendarCheck className="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={() => navigate(`/admin/events/${e.id}/checkin`)}
+                    title="Check-in (camera)"
+                  >
+                    <Ticket className="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
                     onClick={() => navigate(`/admin/events/${e.id}/roster`)}
                     title="View roster"
                   >
@@ -3936,6 +3956,22 @@ function AppContent() {
                   element={
                     <ProtectedRoute role="club_admin">
                       <AttendeeRosterPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/events/:id/checkin"
+                  element={
+                    <ProtectedRoute role="club_admin">
+                      <CheckinScanner />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/events/:id/qr"
+                  element={
+                    <ProtectedRoute role="club_admin">
+                      <QrView />
                     </ProtectedRoute>
                   }
                 />
