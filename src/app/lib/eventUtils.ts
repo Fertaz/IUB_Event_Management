@@ -47,6 +47,25 @@ export function recurrenceLabel(event: Event): string | null {
   return `Repeats ${word} · ${count} session${count > 1 ? "s" : ""}`;
 }
 
+// Format stored 24-hour times for display as 12-hour campus times.
+export function formatEventTime(time: string): string {
+  const match = (time || "").trim().match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i);
+  if (!match) return time;
+
+  const hours = Number.parseInt(match[1], 10);
+  const minutes = match[2];
+  const period = match[3]?.toUpperCase();
+
+  if (period) {
+    const normalizedHours = hours % 12 || 12;
+    return `${normalizedHours}:${minutes} ${period}`;
+  }
+
+  const normalizedHours = hours % 12 || 12;
+  const normalizedPeriod = hours >= 12 ? "PM" : "AM";
+  return `${normalizedHours}:${minutes} ${normalizedPeriod}`;
+}
+
 // Turn "2026-08-01" + "09:00" into a floating calendar timestamp "20260801T090000".
 // Floating (no timezone/Z) means calendar apps interpret it in the user's local
 // time, which is what we want for on-campus events.

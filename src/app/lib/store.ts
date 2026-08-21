@@ -2,6 +2,34 @@
 
 export type UserRole = "student" | "club_admin" | "super_admin";
 
+/**
+ * Executive Committee roles with strict per-club limits enforced by
+ * EXEC_ROLE_LIMITS. Any approved member not assigned an executive role is
+ * placed in the Sub-committee (committee_type = "sub_committee").
+ */
+export type ClubRole =
+  | "President"
+  | "Vice President"
+  | "General Secretary"
+  | "Treasurer"
+  | "Organizing Secretary"
+  | "Event Manager"
+  | "Member";
+
+export type CommitteeType = "executive" | "sub_committee";
+
+/** Maximum number of each executive role allowed per club. */
+export const EXEC_ROLE_LIMITS: Partial<Record<ClubRole, number>> = {
+  President: 1,
+  "Vice President": 2,
+  "General Secretary": 1,
+  Treasurer: 1,
+  "Organizing Secretary": 1,
+};
+
+/** Roles that belong to the executive committee (have limits). */
+export const EXEC_ROLES = Object.keys(EXEC_ROLE_LIMITS) as ClubRole[];
+
 export interface User {
   id: string;
   email: string;
@@ -66,7 +94,17 @@ export interface Membership {
   club_id: string;
   status: "pending" | "approved" | "rejected";
   applied_at: string;
+  /** Club-level role (e.g. "President", "Member"). */
   role?: string;
+  /**
+   * Which committee this member belongs to.
+   * - "executive"     → has an exec-level role (President, VP, …)
+   * - "sub_committee" → regular member / Event Manager
+   * Undefined for pending/rejected memberships.
+   */
+  committee_type?: CommitteeType;
+  /** RBAC permission tags for sub-committee members (e.g. ["manage_events"]). */
+  permissions?: string[];
 }
 
 export interface Notification {
@@ -109,7 +147,7 @@ export interface StoreState {
 
 // ─── Seed Data ───────────────────────────────────────────────────────────────
 
-const USERS: User[] = [
+const CORE_USERS: User[] = [
   {
     id: "user_1",
     email: "anika.rahman@iub.edu.bd",
@@ -181,6 +219,92 @@ const USERS: User[] = [
   },
 ];
 
+const SYNTHETIC_FIRST_NAMES = [
+  "Ayaan",
+  "Nabila",
+  "Farhan",
+  "Tasnina",
+  "Rahim",
+  "Mahi",
+  "Nafisa",
+  "Imran",
+  "Sadia",
+  "Tanim",
+  "Nusrat",
+  "Rafi",
+  "Areeba",
+  "Shihab",
+  "Meher",
+  "Rahat",
+  "Mim",
+  "Samin",
+  "Afsana",
+  "Hasib",
+];
+const SYNTHETIC_LAST_NAMES = [
+  "Hossain",
+  "Ahmed",
+  "Rahman",
+  "Chowdhury",
+  "Sarkar",
+  "Khan",
+  "Islam",
+  "Akter",
+  "Azad",
+  "Mahmud",
+  "Begum",
+  "Amin",
+  "Tasnim",
+  "Jahan",
+  "Nahar",
+  "Khatun",
+  "Kabir",
+  "Araf",
+  "Molla",
+  "Parvez",
+];
+const SYNTHETIC_DEPARTMENTS = [
+  "CSE",
+  "EEE",
+  "BBA",
+  "ENG",
+  "Economics",
+  "Architecture",
+];
+
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function buildSyntheticUsers(targetCount: number): User[] {
+  const users: User[] = [];
+  for (let i = CORE_USERS.length + 1; i <= targetCount; i += 1) {
+    const first =
+      SYNTHETIC_FIRST_NAMES[(i - 1) % SYNTHETIC_FIRST_NAMES.length];
+    const last =
+      SYNTHETIC_LAST_NAMES[
+        Math.floor((i - 1) / SYNTHETIC_FIRST_NAMES.length) %
+          SYNTHETIC_LAST_NAMES.length
+      ];
+    const department =
+      SYNTHETIC_DEPARTMENTS[
+        (i - 1) % SYNTHETIC_DEPARTMENTS.length
+      ];
+    users.push({
+      id: `user_${i}`,
+      email: `${slugify(first)}.${slugify(last)}.${String(i).padStart(3, "0")}@iub.edu.bd`,
+      name: `${first} ${last}`,
+      student_id: `24${String(i).padStart(5, "0")}`,
+      department,
+      role: "student",
+      bio: `${department} student at IUB.`,
+    });
+  }
+  return users;
+}
+
+const USERS: User[] = [...CORE_USERS, ...buildSyntheticUsers(200)];
+
 const CLUBS: Club[] = [
   {
     id: "club_1",
@@ -190,7 +314,7 @@ const CLUBS: Club[] = [
       "The largest technical club at IUB, fostering innovation through hackathons, workshops, and tech talks. We connect students with industry leaders and prepare them for the digital economy.",
     category: "Technology",
     admin_user_id: "user_2",
-    member_count: 247,
+    member_count: 259,
     cover_url:
       "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=800&h=400&fit=crop&auto=format",
     founded: "2015",
@@ -260,12 +384,12 @@ const EVENTS: Event[] = [
     title: "IUB Hackathon 2026",
     description:
       "A 36-hour intensive hackathon where teams of up to 4 students compete to build innovative solutions to real-world problems. Featuring mentorship from industry professionals, prize money of ৳1,50,000, and networking opportunities with tech companies.",
-    date: "2026-08-01",
-    start_time: "09:00",
-    end_time: "21:00",
+    date: "2026-09-01",
+    start_time: "10:00",
+    end_time: "22:00",
     venue: "IUB Main Auditorium, Block A",
     capacity: 150,
-    registered_count: 45,
+    registered_count: 61,
     waitlisted_count: 0,
     poster_url:
       "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&h=500&fit=crop&auto=format",
@@ -279,13 +403,13 @@ const EVENTS: Event[] = [
     title: "Intro to Machine Learning Workshop",
     description:
       "A hands-on workshop covering the fundamentals of machine learning using Python and scikit-learn. Participants will build and evaluate their first ML model. Laptops are required. Pre-registration is mandatory as seats are very limited.",
-    date: "2026-07-25",
-    start_time: "14:00",
+    date: "2026-09-25",
+    start_time: "15:00",
     end_time: "17:00",
     venue: "Computer Lab 3, Block C",
     capacity: 30,
-    registered_count: 30,
-    waitlisted_count: 3,
+    registered_count: 34,
+    waitlisted_count: 7,
     poster_url:
       "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&h=500&fit=crop&auto=format",
     status: "published",
@@ -298,8 +422,8 @@ const EVENTS: Event[] = [
     title: "National Debate Championship Qualifier",
     description:
       "IUB's internal qualifier round for the National University Debate Championship. British Parliamentary format. Open to all IUB students. Winners represent IUB at the nationals.",
-    date: "2026-08-10",
-    start_time: "10:00",
+    date: "2026-09-10",
+    start_time: "11:00",
     end_time: "18:00",
     venue: "Seminar Hall, Block B",
     capacity: 80,
@@ -317,8 +441,8 @@ const EVENTS: Event[] = [
     title: "Photo Walk: Old Dhaka Streets",
     description:
       "An early morning photography expedition through the historic lanes of Old Dhaka — Sadarghat, Ahsan Manzil, and Shankhari Bazar. Capture the soul of the city at golden hour. All skill levels welcome.",
-    date: "2026-07-22",
-    start_time: "06:00",
+    date: "2026-09-22",
+    start_time: "07:00",
     end_time: "11:00",
     venue: "Meet at IUB Main Gate",
     capacity: 20,
@@ -332,16 +456,16 @@ const EVENTS: Event[] = [
     tags: ["Photography", "Cultural", "Outdoor"],
     recurrence: "weekly",
     recurrence_count: 4,
-    exception_dates: ["2026-08-05"],
+    exception_dates: ["2026-09-29"],
   },
   {
     id: "event_5",
     title: "Monsoon Cultural Fest 2026",
     description:
       "The biggest event of the year! A full-day celebration of Bangladeshi arts, music, food, and heritage. Featuring live performances by student bands, traditional dance, folk music, and art installations. Free entry for all IUB students.",
-    date: "2026-08-15",
-    start_time: "10:00",
-    end_time: "22:00",
+    date: "2026-09-15",
+    start_time: "14:00",
+    end_time: "21:00",
     venue: "IUB Open Grounds",
     capacity: 500,
     registered_count: 312,
@@ -358,8 +482,8 @@ const EVENTS: Event[] = [
     title: "Guest Lecture: AI in Healthcare",
     description:
       "Dr. Mahbub Hossain from BRAC University will discuss how artificial intelligence is transforming diagnostics, drug discovery, and patient care in Bangladesh. Q&A session to follow.",
-    date: "2026-07-30",
-    start_time: "15:00",
+    date: "2026-09-30",
+    start_time: "16:00",
     end_time: "17:00",
     venue: "Lecture Hall 1, Block A",
     capacity: 100,
@@ -377,9 +501,9 @@ const EVENTS: Event[] = [
     title: "Monsoon Tree Plantation Drive",
     description:
       "Join us to plant 200 saplings across the IUB campus as part of our commitment to a greener future. Gloves and tools provided. Refreshments included.",
-    date: "2026-07-19",
-    start_time: "08:00",
-    end_time: "12:00",
+    date: "2026-09-19",
+    start_time: "08:30",
+    end_time: "11:30",
     venue: "IUB East Campus Garden",
     capacity: 50,
     registered_count: 12,
@@ -397,8 +521,8 @@ const EVENTS: Event[] = [
     description:
       "The Photography Society's flagship annual showcase — 80+ prints from student photographers displayed in a gallery format. Opening night features live acoustic music and light refreshments.",
     date: "2026-09-05",
-    start_time: "17:00",
-    end_time: "21:00",
+    start_time: "17:30",
+    end_time: "20:30",
     venue: "IUB Gallery Space, Block D",
     capacity: 200,
     registered_count: 67,
@@ -410,6 +534,23 @@ const EVENTS: Event[] = [
     created_by: "user_5",
     tags: ["Photography", "Exhibition", "Arts"],
   },
+];
+
+const CLUB_1_EXTRA_REGISTRATIONS: Registration[] = [
+  ...Array.from({ length: 16 }, (_, i) => ({
+    id: `reg_${9 + i}`,
+    user_id: `user_${9 + i}`,
+    event_id: "event_1",
+    status: "registered" as const,
+    registered_at: `2026-07-${String(17 + i).padStart(2, "0")}T08:00:00Z`,
+  })),
+  ...Array.from({ length: 8 }, (_, i) => ({
+    id: `reg_${25 + i}`,
+    user_id: `user_${25 + i}`,
+    event_id: "event_2",
+    status: i < 4 ? ("registered" as const) : ("waitlisted" as const),
+    registered_at: `2026-07-${String(21 + i).padStart(2, "0")}T09:00:00Z`,
+  })),
 ];
 
 const REGISTRATIONS: Registration[] = [
@@ -471,6 +612,25 @@ const REGISTRATIONS: Registration[] = [
     status: "waitlisted",
     registered_at: "2026-07-13T09:00:00Z",
   },
+  ...CLUB_1_EXTRA_REGISTRATIONS,
+];
+
+const CLUB_1_EXTRA_MEMBERSHIPS: Membership[] = [
+  ...Array.from({ length: 12 }, (_, i) => ({
+    id: `mem_${10 + i}`,
+    user_id: `user_${9 + i}`,
+    club_id: "club_1",
+    status: "approved" as const,
+    applied_at: `2026-02-${String(10 + i).padStart(2, "0")}T09:00:00Z`,
+    role: "Member",
+  })),
+  ...Array.from({ length: 8 }, (_, i) => ({
+    id: `mem_${22 + i}`,
+    user_id: `user_${21 + i}`,
+    club_id: "club_1",
+    status: "pending" as const,
+    applied_at: `2026-07-${String(10 + i).padStart(2, "0")}T10:30:00Z`,
+  })),
 ];
 
 const MEMBERSHIPS: Membership[] = [
@@ -548,7 +708,21 @@ const MEMBERSHIPS: Membership[] = [
     applied_at: "2026-01-20T10:00:00Z",
     role: "President",
   },
+  ...CLUB_1_EXTRA_MEMBERSHIPS,
 ];
+
+const CLUB_1_MEMBERSHIP_REQUEST_NOTIFICATIONS: Notification[] =
+  CLUB_1_EXTRA_MEMBERSHIPS.filter(
+    (membership) => membership.status === "pending",
+  ).map((membership, index) => ({
+    id: `notif_${7 + index}`,
+    user_id: "user_2",
+    type: "membership",
+    message: `${membership.user_id} has requested to join IUB Computer Science Society.`,
+    is_read: false,
+    created_at: membership.applied_at,
+    club_id: "club_1",
+  }));
 
 const NOTIFICATIONS: Notification[] = [
   {
@@ -608,6 +782,7 @@ const NOTIFICATIONS: Notification[] = [
     created_at: "2026-07-16T08:45:00Z",
     club_id: "club_1",
   },
+  ...CLUB_1_MEMBERSHIP_REQUEST_NOTIFICATIONS,
 ];
 
 const ROLE_REQUESTS: RoleRequest[] = [
@@ -703,6 +878,152 @@ export function seedCounters(state: StoreState): void {
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────
+
+/**
+ * Recalculates club.member_count from actual approved memberships so the
+ * dashboard stat always reflects the real database count.
+ */
+export function syncMemberCounts(state: StoreState): StoreState {
+  const counts = new Map<string, number>();
+  for (const m of state.memberships) {
+    if (m.status === "approved") {
+      counts.set(m.club_id, (counts.get(m.club_id) ?? 0) + 1);
+    }
+  }
+  return {
+    ...state,
+    clubs: state.clubs.map((c) => ({
+      ...c,
+      member_count: counts.get(c.id) ?? 0,
+    })),
+  };
+}
+
+/**
+ * Randomly assigns executive and sub-committee roles to all approved members
+ * of the given club, strictly enforcing EXEC_ROLE_LIMITS.
+ *
+ * Algorithm:
+ *  1. Shuffle the approved member list (Fisher-Yates).
+ *  2. Assign limited exec roles in order until each quota is filled.
+ *  3. The club admin (admin_user_id) is always assigned President if they
+ *     don't already hold an exec role.
+ *  4. Remaining members receive "Event Manager" (sub_committee) or "Member"
+ *     (sub_committee) alternately to keep the roster varied.
+ */
+export function assignClubRoles(state: StoreState, clubId: string): StoreState {
+  const club = state.clubs.find((c) => c.id === clubId);
+  if (!club) return state;
+
+  const approved = state.memberships.filter(
+    (m) => m.club_id === clubId && m.status === "approved",
+  );
+  if (approved.length === 0) return state;
+
+  // Fisher-Yates shuffle (non-mutating)
+  const shuffled = [...approved];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Ensure club admin is first so they get President
+  const adminIdx = shuffled.findIndex((m) => m.user_id === club.admin_user_id);
+  if (adminIdx > 0) {
+    const [admin] = shuffled.splice(adminIdx, 1);
+    shuffled.unshift(admin);
+  }
+
+  const execRoleQueue: ClubRole[] = [
+    "President",
+    "Vice President",
+    "Vice President",
+    "General Secretary",
+    "Treasurer",
+    "Organizing Secretary",
+  ];
+  let execIdx = 0;
+  const updatedMemberships = state.memberships.map((m) => {
+    if (m.club_id !== clubId || m.status !== "approved") return m;
+
+    const pos = shuffled.findIndex((s) => s.id === m.id);
+    if (pos === -1) return m;
+
+    if (execIdx < execRoleQueue.length) {
+      const role = execRoleQueue[execIdx++];
+      return {
+        ...m,
+        role,
+        committee_type: "executive" as CommitteeType,
+        permissions: ["manage_events", "manage_members", "view_reports"],
+      };
+    }
+
+    // Sub-committee: alternate Event Manager / Member
+    const isEventManager = pos % 2 === 0;
+    return {
+      ...m,
+      role: isEventManager ? ("Event Manager" as ClubRole) : ("Member" as ClubRole),
+      committee_type: "sub_committee" as CommitteeType,
+      permissions: isEventManager
+        ? ["manage_events", "view_reports"]
+        : ["view_reports"],
+    };
+  });
+
+  return { ...state, memberships: updatedMemberships };
+}
+
+/**
+ * Updates a member's club role, re-classifying their committee_type and
+ * permissions. Enforces EXEC_ROLE_LIMITS — throws if the target exec role is
+ * already at its maximum for the club.
+ */
+export function updateMemberRole(
+  state: StoreState,
+  membershipId: string,
+  newRole: ClubRole,
+): StoreState {
+  const mem = state.memberships.find((m) => m.id === membershipId);
+  if (!mem || mem.status !== "approved") return state;
+
+  const limit = EXEC_ROLE_LIMITS[newRole];
+  if (limit !== undefined) {
+    const currentCount = state.memberships.filter(
+      (m) =>
+        m.club_id === mem.club_id &&
+        m.status === "approved" &&
+        m.role === newRole &&
+        m.id !== membershipId,
+    ).length;
+    if (currentCount >= limit) {
+      throw new Error(
+        `Role "${newRole}" is already at its maximum (${limit}) for this club.`,
+      );
+    }
+  }
+
+  const isExec = EXEC_ROLES.includes(newRole);
+  return {
+    ...state,
+    memberships: state.memberships.map((m) =>
+      m.id === membershipId
+        ? {
+            ...m,
+            role: newRole,
+            committee_type: isExec
+              ? ("executive" as CommitteeType)
+              : ("sub_committee" as CommitteeType),
+            permissions: isExec
+              ? ["manage_events", "manage_members", "view_reports"]
+              : newRole === "Event Manager"
+                ? ["manage_events", "view_reports"]
+                : ["view_reports"],
+          }
+        : m,
+    ),
+  };
+}
 
 export function registerForEvent(state: StoreState, userId: string, eventId: string): StoreState {
   const event = state.events.find((e) => e.id === eventId);
