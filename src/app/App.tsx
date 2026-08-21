@@ -6152,9 +6152,11 @@ function SuperAdminPage() {
 // ─── App Root ─────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const routerBase = import.meta.env.BASE_URL.replace(/\/$/, "") || "/";
+
   return (
     <Providers>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <BrowserRouter basename={routerBase}>
         <Toaster
           richColors
           position="top-right"
