@@ -55,7 +55,33 @@ class AuthService {
     assertIubEmail(email);
 
     if (isFirebaseConfigured && auth) {
-      await signInWithEmailAndPassword(auth, email, credentials.password);
+      try {
+        await signInWithEmailAndPassword(
+          auth,
+          email,
+          credentials.password,
+        );
+      } catch (error) {
+        const expectedDemoPassword = DEMO_CREDENTIALS[email];
+        const isDemoCredential =
+          expectedDemoPassword === credentials.password;
+
+        // Live hotfix: if a known demo credential is used and the Firebase
+        // account does not exist yet, create it once and continue.
+        if (isDemoCredential) {
+          try {
+            await createUserWithEmailAndPassword(
+              auth,
+              email,
+              credentials.password,
+            );
+          } catch {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
       return email;
     }
 
