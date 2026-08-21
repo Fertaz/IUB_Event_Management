@@ -6154,7 +6154,7 @@ function SuperAdminPage() {
 export default function App() {
   return (
     <Providers>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Toaster
           richColors
           position="top-right"
