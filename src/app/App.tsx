@@ -125,6 +125,7 @@ import {
   parseCheckInCode,
   getOccurrences,
   recurrenceLabel,
+  formatEventTime,
 } from "./lib/eventUtils";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -904,7 +905,7 @@ function EventCard({ event }: { event: Event }) {
           </span>
           <span>·</span>
           <Clock className="size-3 shrink-0" />
-          <span>{event.start_time}</span>
+          <span>{formatEventTime(event.start_time)}</span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <MapPin className="size-3 shrink-0" />
@@ -2245,7 +2246,7 @@ function DashboardPage() {
                     </p>
                     <p className="text-xs text-muted-foreground font-mono">
                       {format(parseISO(event.date), "d MMM")} ·{" "}
-                      {event.start_time}
+                      {formatEventTime(event.start_time)}
                     </p>
                   </div>
                   <Badge
@@ -2510,7 +2511,7 @@ function EventDetailPage() {
               {
                 icon: Clock,
                 label: "Time",
-                value: `${event.start_time} – ${event.end_time}`,
+                value: `${formatEventTime(event.start_time)} – ${formatEventTime(event.end_time)}`,
               },
               {
                 icon: MapPin,
@@ -3832,7 +3833,7 @@ function AdminDashboardPage() {
                     </p>
                     <p className="text-xs text-muted-foreground font-mono">
                       {format(parseISO(e.date), "d MMM")} ·{" "}
-                      {e.start_time}
+                      {formatEventTime(e.start_time)}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -3948,7 +3949,7 @@ function EventManagePage() {
                   </div>
                   <p className="text-xs text-muted-foreground font-mono">
                     {format(parseISO(e.date), "d MMM yyyy")} ·{" "}
-                    {e.start_time}
+                    {formatEventTime(e.start_time)}
                   </p>
                   <p className="text-xs text-muted-foreground font-mono mt-0.5">
                     {regs}/{e.capacity} registered
@@ -4485,7 +4486,7 @@ function AttendeeRosterPage() {
           </h1>
           <p className="text-sm text-muted-foreground font-mono mt-1">
             {format(parseISO(event.date), "d MMM yyyy")} ·{" "}
-            {event.start_time}
+            {formatEventTime(event.start_time)}
           </p>
         </div>
         <div className="text-right">

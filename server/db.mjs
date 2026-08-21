@@ -1,9 +1,10 @@
+// noinspection SqlNoDataSourceInspection,SqlResolve
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import { initialState } from "../src/app/lib/store.ts";
+import { initialState } from "../src/app/lib/store";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "data");
@@ -15,12 +16,81 @@ const ROLE_PASSWORDS = {
   super_admin: "Admin@12345",
 };
 
+const TARGET_USER_COUNT = 200;
+const FIRST_NAMES = [
+  "Ayaan",
+  "Nabila",
+  "Farhan",
+  "Tasnina",
+  "Rahim",
+  "Mahi",
+  "Nafisa",
+  "Imran",
+  "Sadia",
+  "Tanim",
+  "Nusrat",
+  "Rafi",
+  "Areeba",
+  "Shihab",
+  "Meher",
+  "Rahat",
+  "Mim",
+  "Samin",
+  "Afsana",
+  "Hasib",
+];
+const LAST_NAMES = [
+  "Hossain",
+  "Ahmed",
+  "Rahman",
+  "Chowdhury",
+  "Sarkar",
+  "Khan",
+  "Islam",
+  "Akter",
+  "Azad",
+  "Mahmud",
+  "Begum",
+  "Amin",
+  "Tasnim",
+  "Jahan",
+  "Nahar",
+  "Khatun",
+  "Kabir",
+  "Araf",
+  "Molla",
+  "Parvez",
+];
+const DEPARTMENTS = ["CSE", "EEE", "BBA", "ENG", "Economics", "Architecture"];
+
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
 function passwordForUser(user) {
   return sha256(ROLE_PASSWORDS[user.role] ?? "Student@12345");
+}
+
+function slugify(value) {
+  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function buildSyntheticUser(index) {
+  const first = FIRST_NAMES[(index - 1) % FIRST_NAMES.length];
+  const last = LAST_NAMES[Math.floor((index - 1) / FIRST_NAMES.length) % LAST_NAMES.length];
+  const name = `${first} ${last}`;
+  const department = DEPARTMENTS[(index - 1) % DEPARTMENTS.length];
+  return {
+    id: `user_${index}`,
+    email: `${slugify(first)}.${slugify(last)}.${String(index).padStart(3, "0")}@iub.edu.bd`,
+    name,
+    student_id: `24${String(index).padStart(5, "0")}`,
+    department,
+    role: "student",
+    avatar: null,
+    bio: `${department} student at IUB.`,
+    password_hash: sha256("Student@12345"),
+  };
 }
 
 function toInt(value) {
@@ -189,8 +259,6 @@ function createSchema(db) {
 
 function seedIfEmpty(db) {
   const hasUsers = db.prepare("SELECT COUNT(*) AS count FROM users").get().count;
-  if (hasUsers > 0) return;
-
   const insert = {
     users: db.prepare(`
       INSERT INTO users (id, email, name, student_id, department, role, avatar, bio, password_hash)
@@ -224,70 +292,82 @@ function seedIfEmpty(db) {
 
   db.exec("BEGIN");
   try {
-    for (const user of initialState.users) {
-      insert.users.run({
-        ...user,
-        avatar: user.avatar ?? null,
-        bio: user.bio ?? null,
-        password_hash: passwordForUser(user),
-      });
+    if (hasUsers === 0) {
+      for (const user of initialState.users) {
+        insert.users.run({
+          ...user,
+          avatar: user.avatar ?? null,
+          bio: user.bio ?? null,
+          password_hash: passwordForUser(user),
+        });
+      }
+
+      for (const club of initialState.clubs) {
+        insert.clubs.run(club);
+      }
+
+      for (const event of initialState.events) {
+        const { tags, exception_dates, ...eventRow } = event;
+        insert.events.run({
+          ...eventRow,
+          tags_json: JSON.stringify(tags ?? []),
+          recurrence: eventRow.recurrence ?? null,
+          recurrence_count: eventRow.recurrence_count ?? null,
+          exception_dates_json: exception_dates
+            ? JSON.stringify(exception_dates)
+            : null,
+        });
+      }
+
+      for (const reg of initialState.registrations) {
+        insert.registrations.run({
+          ...reg,
+          checked_in: toInt(reg.checked_in),
+          checked_in_at: reg.checked_in_at ?? null,
+        });
+      }
+
+      for (const membership of initialState.memberships) {
+        insert.memberships.run({
+          ...membership,
+          role: membership.role ?? null,
+        });
+      }
+
+      for (const notification of initialState.notifications) {
+        insert.notifications.run({
+          ...notification,
+          is_read: toInt(notification.is_read),
+          event_id: notification.event_id ?? null,
+          club_id: notification.club_id ?? null,
+        });
+      }
+
+      for (const roleRequest of initialState.roleRequests) {
+        insert.roleRequests.run({
+          ...roleRequest,
+          club_id: roleRequest.club_id ?? null,
+          club_name: roleRequest.club_name ?? null,
+          club_category: roleRequest.club_category ?? null,
+          club_description: roleRequest.club_description ?? null,
+          message: roleRequest.message ?? null,
+        });
+      }
+
+      db.prepare(
+        "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('current_user_id', '')",
+      ).run();
     }
 
-    for (const club of initialState.clubs) {
-      insert.clubs.run(club);
+    while (
+      db.prepare("SELECT COUNT(*) AS count FROM users").get().count <
+      TARGET_USER_COUNT
+    ) {
+      const nextUserId = nextId(db, "users", "user_");
+      const numericId = Number.parseInt(nextUserId.slice(5), 10);
+      insert.users.run(buildSyntheticUser(numericId));
     }
 
-    for (const event of initialState.events) {
-      const { tags, exception_dates, ...eventRow } = event;
-      insert.events.run({
-        ...eventRow,
-        tags_json: JSON.stringify(tags ?? []),
-        recurrence: eventRow.recurrence ?? null,
-        recurrence_count: eventRow.recurrence_count ?? null,
-        exception_dates_json: exception_dates
-          ? JSON.stringify(exception_dates)
-          : null,
-      });
-    }
-
-    for (const reg of initialState.registrations) {
-      insert.registrations.run({
-        ...reg,
-        checked_in: toInt(reg.checked_in),
-        checked_in_at: reg.checked_in_at ?? null,
-      });
-    }
-
-    for (const membership of initialState.memberships) {
-      insert.memberships.run({
-        ...membership,
-        role: membership.role ?? null,
-      });
-    }
-
-    for (const notification of initialState.notifications) {
-      insert.notifications.run({
-        ...notification,
-        is_read: toInt(notification.is_read),
-        event_id: notification.event_id ?? null,
-        club_id: notification.club_id ?? null,
-      });
-    }
-
-    for (const roleRequest of initialState.roleRequests) {
-      insert.roleRequests.run({
-        ...roleRequest,
-        club_id: roleRequest.club_id ?? null,
-        club_name: roleRequest.club_name ?? null,
-        club_category: roleRequest.club_category ?? null,
-        club_description: roleRequest.club_description ?? null,
-        message: roleRequest.message ?? null,
-      });
-    }
-
-    db.prepare(
-      "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('current_user_id', '')",
-    ).run();
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -301,10 +381,6 @@ export function createDatabase() {
   createSchema(db);
   seedIfEmpty(db);
   return db;
-}
-
-export function hashPassword(password) {
-  return sha256(password);
 }
 
 export function readCurrentUserId(db) {
