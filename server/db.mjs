@@ -4,7 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import { initialState } from "../src/app/lib/store";
+import { initialState } from "../src/app/lib/store.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "data");
@@ -349,6 +349,7 @@ function seedIfEmpty(db) {
   db.exec("BEGIN");
   try {
     if (hasUsers === 0) {
+      for (const user of initialState.users) {
         insert.users.run({
           ...user,
           avatar: user.avatar ?? null,

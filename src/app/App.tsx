@@ -177,6 +177,14 @@ import {
   fetchAppState,
   persistAppState,
 } from "./services/stateService";
+import {
+  fetchClubMembers,
+  assignRoles as assignClubRolesApi,
+  updateMemberRole as updateMemberRoleApi,
+  deleteMember as deleteMemberApi,
+  type GetClubMembersResponse,
+  type MemberSummary,
+} from "./services/memberService";
 
 function createEmptyStore(): StoreState {
   return {
@@ -308,6 +316,11 @@ function Providers({
   children: React.ReactNode;
 }) {
   const [store, setStore] = useState<StoreState>(createEmptyStore);
+  // Always-current ref so callbacks with [] deps can read the latest store
+  // without going stale.
+  const storeRef = React.useRef<StoreState>(store);
+  storeRef.current = store;
+
   const [currentUserId, setCurrentUserId] = useState<
     string | null
   >(null);
@@ -507,43 +520,78 @@ function Providers({
   );
 
   const doRemoveMember = useCallback((membershipId: string) => {
-    setStore((s) => {
-      const mem = s.memberships.find(
-        (m) => m.id === membershipId,
-      );
-      const user = s.users.find((u) => u.id === mem?.user_id);
-      const next = removeMember(s, membershipId);
-      toast.info("Member removed", {
-        description: `${user?.name} removed from club.`,
+    // Read current values via ref to avoid stale closure.
+    const mem = storeRef.current.memberships.find((m) => m.id === membershipId);
+    const clubId = mem?.club_id ?? "";
+    const userName = storeRef.current.users.find((u) => u.id === mem?.user_id)?.name ?? "Member";
+
+    // Optimistic local update.
+    setStore((s) => removeMember(s, membershipId));
+    toast.info("Member removed", { description: `${userName} removed from club.` });
+
+    // Persist to DB — count is re-derived from actual rows on the backend.
+    if (clubId) {
+      void deleteMemberApi(clubId, membershipId).catch(() => {
+        toast.error("Failed to sync removal with server");
       });
-      return next;
-    });
+    }
   }, []);
 
   const doAssignRoles = useCallback((clubId: string) => {
-    setStore((s) => {
-      const next = assignClubRoles(s, clubId);
-      toast.success("Roles assigned", {
-        description: "Executive and sub-committee roles have been randomly assigned.",
+    void assignClubRolesApi(clubId)
+      .then((result) => {
+        // Replace local membership roles with authoritative DB values.
+        setStore((s) => {
+          const roleMap = new Map(result.members.map((m) => [m.id, m]));
+          return {
+            ...s,
+            memberships: s.memberships.map((existing) => {
+              const api = roleMap.get(existing.id);
+              return api
+                ? { ...existing, role: api.role ?? existing.role, committee_type: api.committee_type ?? existing.committee_type }
+                : existing;
+            }),
+          };
+        });
+        toast.success("Roles assigned", {
+          description: "Executive and sub-committee roles have been randomly assigned.",
+        });
+      })
+      .catch(() => {
+        // Fallback: local algorithm when backend is unreachable.
+        setStore((s) => assignClubRoles(s, clubId));
+        toast.success("Roles assigned", {
+          description: "Executive and sub-committee roles have been randomly assigned.",
+        });
       });
-      return next;
-    });
   }, []);
 
   const doUpdateMemberRole = useCallback(
     (membershipId: string, newRole: ClubRole) => {
+      const mem = storeRef.current.memberships.find((m) => m.id === membershipId);
+      const clubId = mem?.club_id ?? "";
+
+      // Optimistic local update.
       setStore((s) => {
         try {
-          const next = updateMemberRole(s, membershipId, newRole);
-          toast.success("Role updated");
-          return next;
-        } catch (err) {
-          toast.error("Role update failed", {
-            description: err instanceof Error ? err.message : undefined,
-          });
+          return updateMemberRole(s, membershipId, newRole);
+        } catch {
           return s;
         }
       });
+
+      // Persist to DB; backend enforces exec-role limits.
+      if (clubId) {
+        void updateMemberRoleApi(clubId, membershipId, newRole)
+          .then(() => toast.success("Role updated"))
+          .catch((err) => {
+            toast.error("Role update failed", {
+              description: err instanceof Error ? err.message : undefined,
+            });
+          });
+      } else {
+        toast.success("Role updated");
+      }
     },
     [],
   );
@@ -4982,103 +5030,242 @@ function MembershipRequestsPage() {
 
 // ─── Member Roster ────────────────────────────────────────────────────────────
 
+const CLUB_ROLES: ClubRole[] = [
+  "President",
+  "Vice President",
+  "General Secretary",
+  "Treasurer",
+  "Organizing Secretary",
+  "Event Manager",
+  "Member",
+];
+
+// Role badge colour: exec roles get a distinct tint.
+const EXEC_ROLES = new Set([
+  "President",
+  "Vice President",
+  "General Secretary",
+  "Treasurer",
+  "Organizing Secretary",
+]);
+
+function roleBadgeClass(role: string | undefined) {
+  if (!role) return "text-primary border-primary/30";
+  if (EXEC_ROLES.has(role))
+    return "text-quaternary border-quaternary/40 bg-quaternary/10";
+  if (role === "Event Manager")
+    return "text-accent border-accent/40 bg-accent/10";
+  return "text-primary border-primary/30";
+}
+
+/**
+ * MemberRosterPage
+ *
+ * Single source of truth: both `totalCount` and `members` come from the same
+ * GET /clubs/:clubId/members response so the count and the rendered list are
+ * always in sync with the database.
+ *
+ * Mutations (remove, assign-roles, role-edit) call the backend directly and
+ * re-fetch after each operation — no local derivation, no slice tricks.
+ */
 function MemberRosterPage() {
-  const { store, doRemoveMember } = useData();
+  const { store } = useData();
   const { currentUser } = useAuth();
 
   const myClub = store.clubs.find(
     (c) => c.admin_user_id === currentUser?.id,
   );
-  const members = store.memberships
-    .filter(
-      (m) =>
-        m.club_id === myClub?.id && m.status === "approved",
-    )
-    .map((m) => ({
-      ...m,
-      user: store.users.find((u) => u.id === m.user_id),
-    }));
 
+  // ── API-sourced state ────────────────────────────────────────────────────
+  const [apiData, setApiData] =
+    useState<GetClubMembersResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [assigningRoles, setAssigningRoles] = useState(false);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+
+  // Fetch members + authoritative count from the same DB query.
+  const refresh = useCallback(async () => {
+    if (!myClub) return;
+    setLoading(true);
+    try {
+      const data = await fetchClubMembers(myClub.id);
+      setApiData(data);
+    } catch {
+      toast.error("Failed to load members");
+    } finally {
+      setLoading(false);
+    }
+  }, [myClub?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  // totalCount = DB aggregate; members = DB rows — always the same dataset.
+  const totalCount = apiData?.totalCount ?? 0;
+  const members: MemberSummary[] = apiData?.members ?? [];
+
+  // ── Mutations ────────────────────────────────────────────────────────────
+
+  async function handleRemove(membershipId: string, memberName: string) {
+    if (!myClub) return;
+    setRemovingId(membershipId);
+    try {
+      await deleteMemberApi(myClub.id, membershipId);
+      toast.info("Member removed", {
+        description: `${memberName} removed from ${myClub.name}.`,
+      });
+      await refresh();
+    } catch (err) {
+      toast.error("Remove failed", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  async function handleAssignRoles() {
+    if (!myClub) return;
+    setAssigningRoles(true);
+    try {
+      // Backend runs Fisher-Yates shuffle, enforces exec-role limits, then
+      // returns the updated list + count from the same query.
+      const result = await assignClubRolesApi(myClub.id);
+      setApiData(result);
+      toast.success("Roles assigned", {
+        description:
+          "Executive and sub-committee roles have been randomly assigned.",
+      });
+    } catch (err) {
+      toast.error("Role assignment failed", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setAssigningRoles(false);
+    }
+  }
+
+  async function handleUpdateRole(membershipId: string, newRole: ClubRole) {
+    if (!myClub) return;
+    setUpdatingRoleId(membershipId);
+    try {
+      // Backend enforces exec-role limits before persisting.
+      await updateMemberRoleApi(myClub.id, membershipId, newRole);
+      toast.success("Role updated");
+      await refresh();
+    } catch (err) {
+      toast.error("Role update failed", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
-          Club Admin
-        </p>
-        <h1
-          style={{ fontFamily: "'Outfit', sans-serif" }}
-          className="text-2xl font-semibold"
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-1">
+            Club Admin
+          </p>
+          <h1
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-2xl font-semibold"
+          >
+            Member Roster
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {myClub?.name} ·{" "}
+            {loading ? "…" : `${totalCount} approved members`}
+          </p>
+        </div>
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void handleAssignRoles()}
+          disabled={assigningRoles || loading || totalCount === 0}
         >
-          Member Roster
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {myClub?.name} · {members.length} approved members
-        </p>
+          {assigningRoles ? "Assigning…" : "Assign Roles"}
+        </Button>
       </div>
 
-      {members.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="No members yet"
-          description=""
-        />
+      {loading ? (
+        <p className="text-sm text-muted-foreground py-8 text-center font-mono">
+          Loading members…
+        </p>
+      ) : members.length === 0 ? (
+        <EmptyState icon={Users} title="No members yet" description="" />
       ) : (
         <div className="bg-card border border-border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="text-xs font-mono">
-                  Member
-                </TableHead>
-                <TableHead className="text-xs font-mono">
-                  Department
-                </TableHead>
-                <TableHead className="text-xs font-mono">
-                  Role
-                </TableHead>
-                <TableHead className="text-xs font-mono">
-                  Joined
-                </TableHead>
+                <TableHead className="text-xs font-mono">Member</TableHead>
+                <TableHead className="text-xs font-mono">Department</TableHead>
+                <TableHead className="text-xs font-mono">Role</TableHead>
+                <TableHead className="text-xs font-mono">Joined</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {members.map(({ user, ...mem }) => (
+              {members.map((mem) => (
                 <TableRow key={mem.id}>
                   <TableCell>
                     <div className="flex items-center gap-2.5">
                       <Avatar className="size-8">
                         <AvatarFallback className="bg-secondary text-secondary-foreground text-xs font-semibold">
-                          {getInitials(user?.name ?? "?")}
+                          {getInitials(mem.name ?? "?")}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="text-sm font-medium">
-                          {user?.name}
-                        </p>
+                        <p className="text-sm font-medium">{mem.name}</p>
                         <p className="text-[10px] text-muted-foreground font-mono">
-                          {user?.student_id}
+                          {mem.student_id}
                         </p>
                       </div>
                     </div>
                   </TableCell>
+
                   <TableCell className="text-xs font-mono text-muted-foreground">
-                    {user?.department}
+                    {mem.department}
                   </TableCell>
+
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] font-mono text-primary border-primary/30"
+                    <Select
+                      value={mem.role ?? "Member"}
+                      onValueChange={(val) =>
+                        void handleUpdateRole(mem.id, val as ClubRole)
+                      }
+                      disabled={updatingRoleId === mem.id}
                     >
-                      {mem.role ?? "Member"}
-                    </Badge>
+                      <SelectTrigger
+                        className={`h-7 w-44 text-[10px] font-mono border ${roleBadgeClass(mem.role ?? "Member")}`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CLUB_ROLES.map((r) => (
+                          <SelectItem
+                            key={r}
+                            value={r}
+                            className="text-xs font-mono"
+                          >
+                            {r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </TableCell>
+
                   <TableCell className="text-xs font-mono text-muted-foreground">
-                    {format(
-                      parseISO(mem.applied_at),
-                      "d MMM yyyy",
-                    )}
+                    {format(parseISO(mem.applied_at), "d MMM yyyy")}
                   </TableCell>
+
                   <TableCell>
                     {mem.user_id !== currentUser?.id && (
                       <Dialog>
@@ -5087,32 +5274,31 @@ function MemberRosterPage() {
                             variant="ghost"
                             size="icon"
                             className="size-7 text-destructive hover:bg-destructive/8"
+                            disabled={removingId === mem.id}
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>
-                              Remove member?
-                            </DialogTitle>
+                            <DialogTitle>Remove member?</DialogTitle>
                             <DialogDescription>
-                              {user?.name} will be removed from{" "}
-                              {myClub?.name}. They can re-apply
-                              later.
+                              {mem.name} will be removed from{" "}
+                              {myClub?.name}. They can re-apply later.
                             </DialogDescription>
                           </DialogHeader>
                           <DialogFooter>
-                            <Button variant="outline">
-                              Cancel
-                            </Button>
+                            <Button variant="outline">Cancel</Button>
                             <Button
                               variant="destructive"
+                              disabled={removingId === mem.id}
                               onClick={() =>
-                                doRemoveMember(mem.id)
+                                void handleRemove(mem.id, mem.name)
                               }
                             >
-                              Remove
+                              {removingId === mem.id
+                                ? "Removing…"
+                                : "Remove"}
                             </Button>
                           </DialogFooter>
                         </DialogContent>
