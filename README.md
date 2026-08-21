@@ -1,7 +1,7 @@
 
-  # SRS Analysis for Web App
+# IUB Event & Club Management | Campus Hub
 
-  This is a code bundle for SRS Analysis for Web App. The original project is available at https://www.figma.com/design/jfklgCMdOqQxG9LrE5kvVq/SRS-Analysis-for-Web-App.
+This is the code repository for the IUB Campus Hub web application, designed to help students discover events, join clubs, and manage campus activities.
 
   ## Running the code
 

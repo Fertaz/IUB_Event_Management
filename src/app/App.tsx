@@ -6,7 +6,7 @@ import React, {
   useEffect,
 } from "react";
 import {
-  HashRouter,
+  BrowserRouter,
   Routes,
   Route,
   Navigate,
@@ -177,6 +177,9 @@ import {
 // Bump the version suffix whenever the data shape changes to discard stale state.
 const STORE_KEY = "iub_hub_store_v2";
 const AUTH_KEY = "iub_hub_auth_v2";
+const PASSWORDS_KEY = "iub_hub_passwords_v1";
+
+type PasswordStore = Record<string, string>;
 
 function loadStore(): StoreState {
   try {
@@ -199,6 +202,39 @@ function loadAuth(): string | null {
     console.warn("Failed to load persisted auth session.", error);
     return null;
   }
+}
+
+function loadPasswords(): PasswordStore {
+  try {
+    const raw = localStorage.getItem(PASSWORDS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as PasswordStore;
+  } catch (error) {
+    console.warn("Failed to load saved account passwords.", error);
+    return {};
+  }
+}
+
+function savePasswords(passwords: PasswordStore): void {
+  try {
+    localStorage.setItem(PASSWORDS_KEY, JSON.stringify(passwords));
+  } catch (error) {
+    console.warn("Failed to save account password.", error);
+  }
+}
+
+function setPassword(userId: string, password: string): void {
+  const passwords = loadPasswords();
+  passwords[userId] = password;
+  savePasswords(passwords);
+}
+
+function verifyPassword(user: User, password: string): boolean {
+  const passwords = loadPasswords();
+  const expected = passwords[user.id] ?? user.student_id;
+  return expected === password;
 }
 
 // ─── Auth Context ─────────────────────────────────────────────────────────────
@@ -1547,19 +1583,37 @@ function GoogleIcon({ className }: { className?: string }) {
 
 function LoginPage() {
   const { switchRole } = useAuth();
+  const { store } = useData();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.endsWith("@iub.edu.bd")) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail.endsWith("@iub.edu.bd")) {
       toast.error("Invalid email", {
         description: "Use your @iub.edu.bd email address.",
       });
       return;
     }
-    switchRole("user_1");
+    const account = store.users.find(
+      (u) => u.email.toLowerCase() === normalizedEmail,
+    );
+    if (!account) {
+      toast.error("Account not found", {
+        description:
+          "No account exists for this email. Please sign up first.",
+      });
+      return;
+    }
+    if (!verifyPassword(account, password)) {
+      toast.error("Incorrect password", {
+        description: "Please check your password and try again.",
+      });
+      return;
+    }
+    switchRole(account.id);
     navigate("/dashboard");
   }
 
@@ -1640,13 +1694,10 @@ function LoginPage() {
           <Button
             variant="outline"
             className="w-full gap-2.5 font-normal"
-            onClick={() => {
-              switchRole("user_1");
-              navigate("/dashboard");
-            }}
+            disabled
           >
             <GoogleIcon className="size-4" />
-            Continue with Google
+            Continue with Google (Coming soon)
           </Button>
 
           <p className="text-sm text-center text-muted-foreground mt-6">
@@ -1659,47 +1710,6 @@ function LoginPage() {
             </Link>
           </p>
 
-          <div className="mt-6 pt-5 border-t border-border">
-            <p className="text-[11px] text-muted-foreground font-mono text-center mb-2">
-              — Demo quick-login —
-            </p>
-            <div className="space-y-2">
-              {[
-                {
-                  label: "Student",
-                  id: "user_1",
-                  email: "anika.rahman@iub.edu.bd",
-                },
-                {
-                  label: "Club Admin",
-                  id: "user_2",
-                  email: "shoikat.azad@iub.edu.bd",
-                },
-                {
-                  label: "Super Admin",
-                  id: "user_3",
-                  email: "admin@iub.edu.bd",
-                },
-              ].map((u) => (
-                <Button
-                  key={u.id}
-                  variant="outline"
-                  className="w-full text-xs justify-start gap-2 font-normal"
-                  onClick={() => {
-                    switchRole(u.id);
-                    navigate("/dashboard");
-                  }}
-                >
-                  <span className="font-medium">
-                    {u.label}:
-                  </span>
-                  <span className="text-muted-foreground font-mono">
-                    {u.email}
-                  </span>
-                </Button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -1710,7 +1720,7 @@ function LoginPage() {
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const { doRegisterUser } = useData();
+  const { doRegisterUser, store } = useData();
   const { switchRole } = useAuth();
   const [form, setForm] = useState({
     name: "",
@@ -1722,10 +1732,22 @@ function RegisterPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.email.endsWith("@iub.edu.bd")) {
+    const normalizedEmail = form.email.trim().toLowerCase();
+    if (!normalizedEmail.endsWith("@iub.edu.bd")) {
       toast.error("Invalid email", {
         description:
           "Registration requires a valid @iub.edu.bd email.",
+      });
+      return;
+    }
+    if (
+      store.users.some(
+        (u) => u.email.toLowerCase() === normalizedEmail,
+      )
+    ) {
+      toast.error("Email already registered", {
+        description:
+          "An account already exists with this email. Please sign in instead.",
       });
       return;
     }
@@ -1737,10 +1759,11 @@ function RegisterPage() {
     }
     const userId = doRegisterUser({
       name: form.name,
-      email: form.email,
+      email: normalizedEmail,
       student_id: form.studentId,
       department: form.department,
     });
+    setPassword(userId, form.password);
     switchRole(userId);
     toast.success("Account created!", {
       description:
@@ -5836,10 +5859,12 @@ function SuperAdminPage() {
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
 
+import LandingPage from "./pages/LandingPage";
+
 export default function App() {
   return (
     <Providers>
-      <HashRouter>
+      <BrowserRouter>
         <Toaster
           richColors
           position="top-right"
@@ -5852,16 +5877,106 @@ export default function App() {
           }}
         />
         <AppContent />
-      </HashRouter>
+      </BrowserRouter>
     </Providers>
   );
 }
 
-function AppContent() {
+function LandingPage() {
   const { currentUser } = useAuth();
 
   return (
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="border-b border-border bg-card/95 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <BookOpen className="size-5 text-primary" />
+            <span
+              style={{ fontFamily: "'Outfit', sans-serif" }}
+              className="font-semibold"
+            >
+              IUB Campus Hub
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" asChild>
+              <Link to="/login">Login</Link>
+            </Button>
+            <Button asChild>
+              <Link to={currentUser ? "/dashboard" : "/register"}>
+                {currentUser ? "Open Dashboard" : "Get Started"}
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-6 py-14 md:py-20">
+        <section className="max-w-3xl">
+          <Badge className="mb-5">Built for IUB students and clubs</Badge>
+          <h1
+            style={{ fontFamily: "'Outfit', sans-serif" }}
+            className="text-4xl md:text-5xl font-semibold leading-tight"
+          >
+            Manage campus events and club activities in one place.
+          </h1>
+          <p className="mt-5 text-base md:text-lg text-muted-foreground max-w-2xl">
+            Discover events, join clubs, track registrations, and coordinate
+            organizers through a single campus platform.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button asChild>
+              <Link to={currentUser ? "/dashboard" : "/register"}>
+                {currentUser ? "Go to Dashboard" : "Create Account"}
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/login">Sign in</Link>
+            </Button>
+          </div>
+        </section>
+
+        <section className="mt-14 grid gap-4 md:grid-cols-3">
+          {[
+            {
+              icon: CalendarDays,
+              title: "Event Discovery",
+              description:
+                "Browse upcoming events, venue details, and schedules in one feed.",
+            },
+            {
+              icon: Users,
+              title: "Club Management",
+              description:
+                "Handle memberships, requests, and member rosters with role controls.",
+            },
+            {
+              icon: BadgeCheck,
+              title: "Attendance & Tracking",
+              description:
+                "Check in attendees, monitor capacity, and view activity summaries.",
+            },
+          ].map((feature) => (
+            <Card key={feature.title} className="h-full">
+              <CardHeader>
+                <feature.icon className="size-5 text-primary mb-1" />
+                <CardTitle className="text-lg">{feature.title}</CardTitle>
+                <CardDescription>
+                  {feature.description}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function AppContent() {
+  return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route
@@ -5988,10 +6103,6 @@ function AppContent() {
         }
       />
 
-      <Route
-        path="/"
-        element={<Navigate to="/login" replace />}
-      />
     </Routes>
   );
 }
