@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "C:\\PROGRA~1\\nodejs\\node.exe node_modules/vite/bin/vite.js build",
-    "dev": "C:\\PROGRA~1\\nodejs\\node.exe scripts/dev.mjs"
+    "build": "vite build",
+    "dev": "node scripts/dev.mjs"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
