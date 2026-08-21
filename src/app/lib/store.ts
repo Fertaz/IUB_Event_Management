@@ -50,6 +50,8 @@ export interface Registration {
   event_id: string;
   status: "registered" | "waitlisted";
   registered_at: string;
+  checked_in?: boolean;
+  checked_in_at?: string;
 }
 
 export interface Membership {
@@ -673,6 +675,24 @@ function superAdminIds(state: StoreState): string[] {
   return state.users.filter((u) => u.role === "super_admin").map((u) => u.id);
 }
 
+// When rehydrating persisted state, advance the ID counters past any IDs already
+// present so newly-created records never collide with rehydrated ones.
+export function seedCounters(state: StoreState): void {
+  const maxNum = (ids: string[], prefix: string): number =>
+    ids.reduce((max, id) => {
+      const n = parseInt(id.slice(prefix.length), 10);
+      return Number.isFinite(n) && n > max ? n : max;
+    }, 100);
+
+  _notifCounter = Math.max(_notifCounter, maxNum(state.notifications.map((n) => n.id), "notif_"));
+  _regCounter = Math.max(_regCounter, maxNum(state.registrations.map((r) => r.id), "reg_"));
+  _memCounter = Math.max(_memCounter, maxNum(state.memberships.map((m) => m.id), "mem_"));
+  _evtCounter = Math.max(_evtCounter, maxNum(state.events.map((e) => e.id), "event_"));
+  _userCounter = Math.max(_userCounter, maxNum(state.users.map((u) => u.id), "user_"));
+  _rrCounter = Math.max(_rrCounter, maxNum(state.roleRequests.map((r) => r.id), "rr_"));
+  _clubCounter = Math.max(_clubCounter, maxNum(state.clubs.map((c) => c.id), "club_"));
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export function registerForEvent(state: StoreState, userId: string, eventId: string): StoreState {
@@ -777,6 +797,26 @@ export function cancelRegistration(state: StoreState, userId: string, eventId: s
   }
 
   return newState;
+}
+
+// QR check-in: mark a registration as attended (or undo it).
+export function setCheckIn(
+  state: StoreState,
+  registrationId: string,
+  value: boolean
+): StoreState {
+  return {
+    ...state,
+    registrations: state.registrations.map((r) =>
+      r.id === registrationId
+        ? {
+            ...r,
+            checked_in: value,
+            checked_in_at: value ? new Date().toISOString() : undefined,
+          }
+        : r
+    ),
+  };
 }
 
 export function applyToClub(state: StoreState, userId: string, clubId: string): StoreState {
